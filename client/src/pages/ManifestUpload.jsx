@@ -110,7 +110,7 @@ const Upload = () => {
         {/* Manifest Number Input */}
         <div style={styles.manifestNumberContainer}>
           <label style={styles.manifestNumberLabel}>
-            Manifest Number (optional):
+            Manifest Number:
             <input
               type="text"
               value={manifestNumber}
