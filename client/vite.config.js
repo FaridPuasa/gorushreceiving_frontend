@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'grscanningsystemserver.vercel.app'
+      '/api': 'https://grscanningsystemserver.onrender.com'
     }
   }
 })
