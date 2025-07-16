@@ -310,6 +310,47 @@ const ManifestScanTracker = () => {
     });
   };
 
+  // Export manifest as CSV
+  const exportToCSV = (manifest) => {
+    const stats = getManifestStats(manifest);
+    
+    // Create CSV header
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += `Manifest Number,${manifest.manifestNumber}\n`;
+    csvContent += `Created At,${formatDate(manifest.createdAt)}\n`;
+    csvContent += `Status,${stats.percentage}% Complete\n`;
+    csvContent += `Total Parcels,${stats.total}\n`;
+    csvContent += `Scanned Parcels,${stats.scanned}\n`;
+    csvContent += `Pending Parcels,${stats.pending}\n\n`;
+    
+    // Add scanned parcels section
+    csvContent += `Scanned Parcels (${stats.scanned})\n`;
+    csvContent += "Tracking Number,Consignee Name,Received At,Received By\n";
+    manifest.parcels
+      .filter(p => p.received)
+      .forEach(p => {
+        csvContent += `${p.trackingNumber},"${p.consigneeName}",${p.receivedAt ? formatDate(p.receivedAt) : ''},"${p.receivedBy || ''}"\n`;
+      });
+    
+    // Add pending parcels section
+    csvContent += `\nPending Parcels (${stats.pending})\n`;
+    csvContent += "Tracking Number,Consignee Name,Shipment Date\n";
+    manifest.parcels
+      .filter(p => !p.received)
+      .forEach(p => {
+        csvContent += `${p.trackingNumber},"${p.consigneeName}",${p.shipmentDate ? formatDate(p.shipmentDate) : ''}\n`;
+      });
+    
+    // Create download link
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${manifest.manifestNumber}_scan_report.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Filter and sort manifests
   const filteredManifests = manifests
     .filter(manifest => {
@@ -591,31 +632,52 @@ const ManifestScanTracker = () => {
                           <div style={{ fontSize: '12px', fontWeight: '500', color: '#6b7280', textTransform: 'uppercase' }}>Total</div>
                         </div>
                         
-                        <button
-                          onClick={() => toggleManifest(manifest.manifestNumber)}
-                          style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '8px', 
-                            color: '#2563eb', 
-                            backgroundColor: 'transparent', 
-                            border: 'none', 
-                            cursor: 'pointer',
-                            fontWeight: '500'
-                          }}
-                        >
-                          {isExpanded ? (
-                            <>
-                              <EyeOff style={{ width: '20px', height: '20px' }} />
-                              <span>Hide Details</span>
-                            </>
-                          ) : (
-                            <>
-                              <Eye style={{ width: '20px', height: '20px' }} />
-                              <span>View Details</span>
-                            </>
-                          )}
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={() => exportToCSV(manifest)}
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '4px', 
+                              padding: '8px 12px',
+                              backgroundColor: '#f3f4f6',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontWeight: '500'
+                            }}
+                          >
+                            <Download style={{ width: '16px', height: '16px', color: "black" }} />
+                            <span style={{color: "black"}}>Export</span>
+                          </button>
+                          
+                          <button
+                            onClick={() => toggleManifest(manifest.manifestNumber)}
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '4px', 
+                              padding: '8px 12px',
+                              backgroundColor: '#f3f4f6',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontWeight: '500'
+                            }}
+                          >
+                            {isExpanded ? (
+                              <>
+                                <EyeOff style={{ width: '16px', height: '16px', color: "black" }} />
+                                <span style={{color: "black"}}>Hide</span>
+                              </>
+                            ) : (
+                              <>
+                                <Eye style={{ width: '16px', height: '16px', color: "black" }} />
+                                <span style={{color: "black"}}>View</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
