@@ -42,7 +42,7 @@ useEffect(() => {
   const fetchCustomerStats = async () => {
     setIsLoadingStats(true);
     try {
-      const res = await fetch(`/api/stats/customers?manifest=${encodeURIComponent(selectedManifest)}`);
+      const res = await fetch(`https://grscanningsystemserver.onrender.com/api/stats/customers?manifest=${encodeURIComponent(selectedManifest)}`);
       const data = await res.json();
       if (data.success) {
         setCustomerStats(data.stats);
@@ -89,7 +89,7 @@ const sortedManifests = [...manifests].sort((a, b) => new Date(b.date) - new Dat
 useEffect(() => {
   const loadManifests = async () => {
     try {
-      const res = await fetch('/api/manifests/scan-stats');
+      const res = await fetch('https://grscanningsystemserver.onrender.com/api/manifests/scan-stats');
       const data = await res.json();
       if (data.success) {
         // Sort manifests by date (newest first)
@@ -195,7 +195,7 @@ const fetchCustomerStats = async (manifestNumber = null) => {
     }
 
     const manifestToFetch = manifestNumber || selectedManifest;
-    const res = await fetch(`/api/stats/customers?manifest=${encodeURIComponent(manifestToFetch)}`);
+    const res = await fetch(`https://grscanningsystemserver.onrender.com/api/stats/customers?manifest=${encodeURIComponent(manifestToFetch)}`);
     
     if (!res.ok) {
       throw new Error(`HTTP error! status: ${res.status}`);
@@ -234,7 +234,7 @@ const fetchCustomerStats = async (manifestNumber = null) => {
   };
 
 const submitScan = async (trackingNumber, timestamp) => {
-  const response = await fetch('/api/scan', {
+  const response = await fetch('https://grscanningsystemserver.onrender.com/api/scan', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ 
