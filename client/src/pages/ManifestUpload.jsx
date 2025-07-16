@@ -45,17 +45,13 @@ const Upload = () => {
   };
 
   const handleSubmit = async () => {
+    // Filter out completely empty rows (where all fields are empty)
     const dataToSubmit = tableData.filter(row => 
-      row['Tracking Number']?.trim()
+      Object.values(row).some(value => value !== undefined && value !== '')
     );
 
-    if (!dataToSubmit.length) {
-      setMessage('Please paste valid parcel data');
-      return;
-    }
-
-    if (!manifestNumber.trim()) {
-      setMessage('Please enter a manifest number');
+    if (dataToSubmit.length === 0) {
+      setMessage('No data to upload');
       return;
     }
 
@@ -68,7 +64,7 @@ const Upload = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           tableData: dataToSubmit,
-          manifestNumber: manifestNumber.trim()
+          manifestNumber: manifestNumber.trim() || null // Send null if empty
         })
       });
 
@@ -103,7 +99,7 @@ const Upload = () => {
         <div style={styles.instructions}>
           <h2 style={styles.instructionsTitle}>Instructions:</h2>
           <ol style={styles.instructionsList}>
-            <li>Enter a manifest number</li>
+            <li>Optionally enter a manifest number</li>
             <li>Select and copy entire columns from Excel (1000+ rows supported)</li>
             <li>Click in the corresponding column below the header and paste (Ctrl+V)</li>
             <li>Repeat for other columns as needed</li>
@@ -114,14 +110,13 @@ const Upload = () => {
         {/* Manifest Number Input */}
         <div style={styles.manifestNumberContainer}>
           <label style={styles.manifestNumberLabel}>
-            Manifest Number:
+            Manifest Number (optional):
             <input
               type="text"
               value={manifestNumber}
               onChange={(e) => setManifestNumber(e.target.value)}
               style={styles.manifestNumberInput}
-              placeholder="Enter manifest number"
-              required
+              placeholder="Enter manifest number (optional)"
             />
           </label>
         </div>
@@ -165,7 +160,7 @@ const Upload = () => {
         <div style={styles.statusBar}>
           {tableData.length > 1 && (
             <div style={styles.rowCount}>
-              {tableData.filter(row => Object.keys(row).length > 0).length} rows with data
+              {tableData.filter(row => Object.values(row).some(v => v)).length} rows with data
             </div>
           )}
         </div>
@@ -174,9 +169,9 @@ const Upload = () => {
         <div style={styles.buttonContainer}>
           <button
             onClick={handleSubmit}
-            disabled={isLoading || tableData.every(row => Object.keys(row).length === 0) || !manifestNumber.trim()}
+            disabled={isLoading || tableData.every(row => Object.values(row).every(v => !v))}
             style={
-              isLoading || tableData.every(row => Object.keys(row).length === 0) || !manifestNumber.trim()
+              isLoading || tableData.every(row => Object.values(row).every(v => !v))
                 ? {...styles.button, ...styles.buttonDisabled}
                 : {...styles.button, ...styles.buttonPrimary}
             }
@@ -208,7 +203,6 @@ const Upload = () => {
     </div>
   );
 };
-
 const styles = {
   container: {
     minHeight: '100vh',
