@@ -116,7 +116,7 @@ const Upload = () => {
               value={manifestNumber}
               onChange={(e) => setManifestNumber(e.target.value)}
               style={styles.manifestNumberInput}
-              placeholder="Enter manifest number (optional)"
+              placeholder="Enter manifest number"
             />
           </label>
         </div>
