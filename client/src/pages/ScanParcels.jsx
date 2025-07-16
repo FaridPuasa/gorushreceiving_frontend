@@ -114,33 +114,39 @@ useEffect(() => {
 
   // Handle barcode scanner input
   useEffect(() => {
-    const handleKeyPress = (e) => {
-      if (!isScanning) return;
+const handleKeyPress = (e) => {
+  if (!isScanning) return;
 
-      if (e.key === 'Enter') {
-        if (scanBuffer.current.length > 0) {
-          handleAutoScan(scanBuffer.current.trim());
-          scanBuffer.current = '';
-        }
-        e.preventDefault();
-        return;
-      }
+  // Ignore Enter key if we're already processing a scan
+  if (e.key === 'Enter' && scanTimeout.current) {
+    e.preventDefault();
+    return;
+  }
 
-      if (e.key.length === 1) {
-        scanBuffer.current += e.key;
-        
-        if (scanTimeout.current) {
-          clearTimeout(scanTimeout.current);
-        }
-        
-        scanTimeout.current = setTimeout(() => {
-          if (scanBuffer.current.length > 0) {
-            handleAutoScan(scanBuffer.current.trim());
-            scanBuffer.current = '';
-          }
-        }, 100);
+  if (e.key === 'Enter') {
+    if (scanBuffer.current.length > 0) {
+      handleAutoScan(scanBuffer.current.trim());
+      scanBuffer.current = '';
+    }
+    e.preventDefault();
+    return;
+  }
+
+  if (e.key.length === 1) {
+    scanBuffer.current += e.key;
+    
+    if (scanTimeout.current) {
+      clearTimeout(scanTimeout.current);
+    }
+    
+    scanTimeout.current = setTimeout(() => {
+      if (scanBuffer.current.length > 0) {
+        handleAutoScan(scanBuffer.current.trim());
+        scanBuffer.current = '';
       }
-    };
+    }, 100);
+  }
+};
 
     if (isScanning) {
       document.addEventListener('keypress', handleKeyPress);
