@@ -112,54 +112,61 @@ useEffect(() => {
   loadManifests();
 }, []);
 
-  // Handle barcode scanner input
-  useEffect(() => {
-const handleKeyPress = (e) => {
-  if (!isScanning) return;
+useEffect(() => {
+  const handleKeyPress = (e) => {
+    if (!isScanning) return;
 
-  // Ignore Enter key if we're already processing a scan
-  if (e.key === 'Enter' && scanTimeout.current) {
-    e.preventDefault();
-    return;
-  }
+    if (e.key === 'Enter') {
+      e.preventDefault();
 
-  if (e.key === 'Enter') {
-    if (scanBuffer.current.length > 0) {
-      handleAutoScan(scanBuffer.current.trim());
-      scanBuffer.current = '';
-    }
-    e.preventDefault();
-    return;
-  }
+      // Clear timeout to prevent double processing
+      if (scanTimeout.current) {
+        clearTimeout(scanTimeout.current);
+        scanTimeout.current = null;
+      }
 
-  if (e.key.length === 1) {
-    scanBuffer.current += e.key;
-    
-    if (scanTimeout.current) {
-      clearTimeout(scanTimeout.current);
-    }
-    
-    scanTimeout.current = setTimeout(() => {
       if (scanBuffer.current.length > 0) {
         handleAutoScan(scanBuffer.current.trim());
         scanBuffer.current = '';
       }
-    }, 100);
-  }
-};
-
-    if (isScanning) {
-      document.addEventListener('keypress', handleKeyPress);
-      inputRef.current?.focus();
+      return;
     }
 
-    return () => {
-      document.removeEventListener('keypress', handleKeyPress);
+    if (e.key.length === 1) {
+      scanBuffer.current += e.key;
+
+      // Disable timeout logic to avoid double submission
+      // Optionally, keep this if you want fallback for scanners that don't send Enter
+      /*
       if (scanTimeout.current) {
         clearTimeout(scanTimeout.current);
       }
-    };
-  }, [isScanning]);
+
+      scanTimeout.current = setTimeout(() => {
+        if (scanBuffer.current.length > 0) {
+          handleAutoScan(scanBuffer.current.trim());
+          scanBuffer.current = '';
+        }
+        scanTimeout.current = null;
+      }, 100);
+      */
+    }
+  };
+
+  if (isScanning) {
+    document.addEventListener('keypress', handleKeyPress);
+    inputRef.current?.focus();
+  }
+
+  return () => {
+    document.removeEventListener('keypress', handleKeyPress);
+    if (scanTimeout.current) {
+      clearTimeout(scanTimeout.current);
+      scanTimeout.current = null;
+    }
+  };
+}, [isScanning]);
+
 
   // Load initial data
   useEffect(() => {
