@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Pause, Play, Package, CheckCircle, AlertCircle, Wifi, WifiOff, User, RefreshCw, AlertTriangle, X } from 'lucide-react';
 
@@ -27,30 +26,38 @@ const ScanParcels = () => {
   const scanTimeout = useRef(null);
 
   useEffect(() => {
-    if (selectedManifest) {
-      fetchCustomerStats(selectedManifest);
-    }
-  }, [selectedManifest]);
+  if (selectedManifest) {
+    fetchCustomerStats(selectedManifest);
+  }
+}, [selectedManifest]);
 
-  useEffect(() => {
-    const loadManifests = async () => {
-      try {
-        const res = await fetch('/api/manifests/scan-stats');
-        const data = await res.json();
-        if (data.success) {
-          setManifests(data.manifests);
-          // Optionally preselect the first manifest
-          if (data.manifests.length > 0) {
-            setSelectedManifest(data.manifests[0].manifestNumber);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load manifests:', error);
+useEffect(() => {
+  if (!selectedManifest) {
+    setCustomerStats([]); // Clear stats when no manifest selected
+    return;
+  }
+
+  
+
+  const fetchCustomerStats = async () => {
+    setIsLoadingStats(true);
+    try {
+      const res = await fetch(`/api/stats/customers?manifest=${encodeURIComponent(selectedManifest)}`);
+      const data = await res.json();
+      if (data.success) {
+        setCustomerStats(data.stats);
       }
-    };
-    
-    loadManifests();
-  }, []);
+    } catch (error) {
+      console.error('Failed to fetch customer stats:', error);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+
+  fetchCustomerStats();
+}, [selectedManifest]);
+
+
 
   // Monitor online/offline status
   useEffect(() => {
@@ -69,26 +76,41 @@ const ScanParcels = () => {
     };
   }, []);
 
-  const isMultiParcelCustomer = (trackingNumber) => {
-    const customerName = extractCustomerName(trackingNumber);
-    if (!customerName) return false;
-    
-    const customerStat = customerStats.find(stat => stat._id === customerName);
-    return customerStat && customerStat.parcelCount > 1;
-  };
+ const isMultiParcelCustomer = (trackingNumber) => {
+  const customerName = extractCustomerName(trackingNumber);
+  if (!customerName) return false;
+  
+  const customerStat = customerStats.find(stat => stat._id === customerName);
+  return customerStat && customerStat.parcelCount > 1;
+};
+const sortedManifests = [...manifests].sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  const loadManifestDetails = async (manifestNumber) => {
+
+useEffect(() => {
+  const loadManifests = async () => {
     try {
-      const res = await fetch(`/api/manifests/${manifestNumber}/scans`);
+      const res = await fetch('/api/manifests/scan-stats');
       const data = await res.json();
       if (data.success) {
-        setManifestDetails(data);
-        setViewMode('manifest');
+        // Sort manifests by date (newest first)
+        const sortedManifests = [...data.manifests].sort((a, b) => 
+          new Date(b.date) - new Date(a.date)
+        );
+        
+        setManifests(sortedManifests);
+        
+        // Automatically select the first manifest if available
+        if (sortedManifests.length > 0) {
+          setSelectedManifest(sortedManifests[0].manifestNumber);
+        }
       }
     } catch (error) {
-      console.error('Failed to load manifest details:', error);
+      console.error('Failed to load manifests:', error);
     }
   };
+
+  loadManifests();
+}, []);
 
   // Handle barcode scanner input
   useEffect(() => {
@@ -140,8 +162,7 @@ const ScanParcels = () => {
   }, []);
 
   const loadUserName = () => {
-    // Simulate localStorage behavior with state
-    const saved = userName || '';
+    const saved = localStorage.getItem('scannerUserName');
     if (saved) {
       setUserName(saved);
     }
@@ -149,31 +170,51 @@ const ScanParcels = () => {
 
   const saveUserName = (name) => {
     setUserName(name);
-    // Simulate localStorage.setItem
+    localStorage.setItem('scannerUserName', name);
   };
 
-  const fetchCustomerStats = async (manifestNumber = null) => {
-    setIsLoadingStats(true);
-    try {
-      let url = '/api/stats/customers';
-      if (manifestNumber) {
-        url += `?manifest=${encodeURIComponent(manifestNumber)}`;
-      }
-      
-      // Simulate API call with mock data
-      const mockStats = [
-        { _id: 'John Doe', parcelCount: 3, receivedCount: 2, trackingNumbers: ['ABC123', 'DEF456', 'GHI789'] },
-        { _id: 'Jane Smith', parcelCount: 1, receivedCount: 1, trackingNumbers: ['JKL012'] },
-        { _id: 'Bob Johnson', parcelCount: 5, receivedCount: 3, trackingNumbers: ['MNO345', 'PQR678', 'STU901', 'VWX234', 'YZA567'] }
-      ];
-      
-      setCustomerStats(mockStats);
-    } catch (error) {
-      console.error('Failed to fetch customer stats:', error);
-    } finally {
-      setIsLoadingStats(false);
+
+
+  useEffect(() => {
+    if (!selectedManifest) {
+      setCustomerStats([]);
+      return;
     }
-  };
+
+    fetchCustomerStats(selectedManifest);
+  }, [selectedManifest]);
+
+const fetchCustomerStats = async (manifestNumber = null) => {
+  setIsLoadingStats(true);
+  
+  try {
+    // Don't fetch if no manifest is selected
+    if (!manifestNumber && !selectedManifest) {
+      setCustomerStats([]);
+      return;
+    }
+
+    const manifestToFetch = manifestNumber || selectedManifest;
+    const res = await fetch(`/api/stats/customers?manifest=${encodeURIComponent(manifestToFetch)}`);
+    
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+
+    const data = await res.json();
+    
+    if (data.success && Array.isArray(data.stats)) {
+      setCustomerStats(data.stats);
+    } else {
+      setCustomerStats([]);
+    }
+  } catch (error) {
+    console.error('Failed to fetch customer stats:', error);
+    setCustomerStats([]);
+  } finally {
+    setIsLoadingStats(false);
+  }
+};
 
   const processPendingScans = async () => {
     if (pendingScans.length === 0) return;
@@ -192,64 +233,72 @@ const ScanParcels = () => {
     }
   };
 
-  const submitScan = async (trackingNumber, timestamp) => {
-    // Simulate API call
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (Math.random() > 0.1) { // 90% success rate
-          resolve({ message: 'Scan successful' });
-        } else {
-          reject(new Error('Scan failed'));
-        }
-      }, 500);
-    });
-  };
+const submitScan = async (trackingNumber, timestamp) => {
+  const response = await fetch('/api/scan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+      trackingNumber,
+      userId,
+      userName,
+      timestamp,
+      manifestNumber: selectedManifest // Add this line
+    })
+  });
 
-  const extractCustomerName = (trackingNumber) => {
-    // Find the customer by looking for the tracking number in their tracking numbers array
-    const customer = customerStats.find(stat => {
-      // Check if this tracking number belongs to this customer
-      return stat.trackingNumbers && stat.trackingNumbers.includes(trackingNumber);
-    });
-    
-    return customer ? customer._id : null; // _id contains the customer name
-  };
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Scan failed');
+  }
 
-  const handleAutoScan = async (scannedNumber) => {
-    if (!scannedNumber || scannedNumber.length < 3) return;
+  return response.json();
+};
 
-    const scanData = {
+const extractCustomerName = (trackingNumber) => {
+  // Find the customer by looking for the tracking number in their tracking numbers array
+  const customer = customerStats.find(stat => {
+    // Check if this tracking number belongs to this customer
+    return stat.trackingNumbers && stat.trackingNumbers.includes(trackingNumber);
+  });
+  
+  return customer ? customer._id : null; // _id contains the customer name
+};
+
+const handleAutoScan = async (scannedNumber) => {
+  if (!scannedNumber || scannedNumber.length < 3) return;
+
+  const scanData = {
       scannedNumber,
       timestamp: new Date().toISOString(),
       scanId: Date.now(),
       manifestNumber: selectedManifest
     };
 
-    const customerName = extractCustomerName(scannedNumber);
-    if (!customerName) {
-      // If customer not found, proceed with normal scan
-      processScan(scannedNumber, new Date().toISOString(), Date.now());
-      return;
-    }
-
-    const customerStat = customerStats.find(stat => stat._id === customerName);
-    
-    if (customerStat && customerStat.parcelCount > 1) {
-      // Show warning and pause processing
-      setCurrentCustomer(customerName);
-      setCustomerParcelCount(customerStat.parcelCount);
-      setPendingScanData({
-        scannedNumber,
-        timestamp: new Date().toISOString(),
-        scanId: Date.now()
-      });
-      setShowMultiParcelWarning(true);
-      return;
-    }
-
-    // Proceed with normal scan if no warning needed
+  const customerName = extractCustomerName(scannedNumber);
+  if (!customerName) {
+    // If customer not found, proceed with normal scan
     processScan(scannedNumber, new Date().toISOString(), Date.now());
-  };
+    return;
+  }
+
+  const customerStat = customerStats.find(stat => stat._id === customerName);
+  
+  if (customerStat && customerStat.parcelCount > 1) {
+    // Show warning and pause processing
+    setCurrentCustomer(customerName); // Now using the actual customer name
+    setCustomerParcelCount(customerStat.parcelCount);
+    setPendingScanData({
+      scannedNumber,
+      timestamp: new Date().toISOString(),
+      scanId: Date.now()
+    });
+    setShowMultiParcelWarning(true);
+    return;
+  }
+
+  // Proceed with normal scan if no warning needed
+  processScan(scannedNumber, new Date().toISOString(), Date.now());
+};
 
   const processScan = async (scannedNumber, timestamp, scanId) => {
     const newScan = {
@@ -346,25 +395,25 @@ const ScanParcels = () => {
     }
   };
 
-  const getStatusColor = (status, trackingNumber) => {
-    // Check if this is a multi-parcel customer first
-    const isMultiParcel = trackingNumber && isMultiParcelCustomer(trackingNumber);
-    
-    if (isMultiParcel && status === 'success') {
-      return { 
-        backgroundColor: '#F5F3FF', 
-        borderColor: '#DDD6FE', 
-        color: '#5B21B6' 
-      };
-    }
+const getStatusColor = (status, trackingNumber) => {
+  // Check if this is a multi-parcel customer first
+  const isMultiParcel = trackingNumber && isMultiParcelCustomer(trackingNumber);
+  
+  if (isMultiParcel && status === 'success') {
+    return { 
+      backgroundColor: '#F5F3FF', 
+      borderColor: '#DDD6FE', 
+      color: '#5B21B6' 
+    };
+  }
 
-    switch (status) {
-      case 'success': return { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5', color: '#065F46' };
-      case 'error': return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', color: '#991B1B' };
-      case 'pending': return { backgroundColor: '#FFFBEB', borderColor: '#FDE68A', color: '#92400E' };
-      default: return { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB', color: '#1F2937' };
-    }
-  };
+  switch (status) {
+    case 'success': return { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5', color: '#065F46' };
+    case 'error': return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', color: '#991B1B' };
+    case 'pending': return { backgroundColor: '#FFFBEB', borderColor: '#FDE68A', color: '#92400E' };
+    default: return { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB', color: '#1F2937' };
+  }
+};
 
   const containerStyle = {
     minHeight: '100vh',
@@ -400,7 +449,7 @@ const ScanParcels = () => {
     color: 'white'
   };
 
-  const ManifestDetailsView = () => {
+    const ManifestDetailsView = () => {
     if (!manifestDetails) return null;
 
     return (
@@ -549,6 +598,7 @@ const ScanParcels = () => {
       </div>
     );
   };
+
 
   return (
     <div style={containerStyle}>
@@ -736,58 +786,68 @@ const ScanParcels = () => {
               </div>
             </div>
 
-            <div style={{ 
-              marginBottom: '16px',
-              backgroundColor: '#F9FAFB',
-              padding: '16px',
-              borderRadius: '8px',
-              border: '1px solid #E5E7EB'
-            }}>
-              <label style={{ 
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '8px'
-              }}>
-                Select Manifest
-              </label>
-              <select
-                value={selectedManifest}
-                onChange={(e) => setSelectedManifest(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  outline: 'none',
-                  backgroundColor: 'white'
-                }}
-              >
-                <option value="">All Manifests</option>
-                {manifests.map(manifest => (
-                  <option key={manifest.manifestNumber} value={manifest.manifestNumber}>
-                    {manifest.manifestNumber} ({manifest.date ? new Date(manifest.date).toLocaleDateString() : 'No date'}) - 
-                    {manifest.receivedParcels}/{manifest.totalParcels} parcels
-                  </option>
-                ))}
-              </select>
-              
-              <button
-                onClick={() => loadManifestDetails(selectedManifest)}
-                style={{
-                  ...buttonStyle,
-                  backgroundColor: '#F3F4F6',
-                  color: '#1F2937',
-                  marginTop: '8px',
-                  width: '100%'
-                }}
-              >
-                <Package size={16} />
-                <span>View Manifest Details</span>
-              </button>
-            </div>
+<div style={{ 
+  marginBottom: '16px',
+  backgroundColor: '#F9FAFB',
+  padding: '16px',
+  borderRadius: '8px',
+  border: '1px solid #E5E7EB'
+}}>
+<label style={{ 
+  display: 'block',
+  fontSize: '14px',
+  fontWeight: '500',
+  color: '#374151',
+  marginBottom: '8px'
+}}>
+  Select Manifest
+</label>
+<select
+  value={selectedManifest}
+  onChange={(e) => setSelectedManifest(e.target.value)}
+  style={{
+    width: '100%',
+    padding: '10px 12px',
+    border: '1px solid #D1D5DB',
+    borderRadius: '6px',
+    fontSize: '14px',
+    outline: 'none',
+    backgroundColor: 'white'
+  }}
+  disabled={manifests.length === 0}
+>
+  {manifests.length === 0 ? (
+    <option value="">Loading manifests...</option>
+  ) : (
+    <>
+      <option value="">Select a manifest</option>
+      {manifests.map(manifest => (
+        <option key={manifest.manifestNumber} value={manifest.manifestNumber}>
+          {manifest.manifestNumber} ({manifest.date ? new Date(manifest.date).toLocaleDateString() : 'No date'}) - 
+          {manifest.receivedParcels}/{manifest.totalParcels} parcels
+        </option>
+      ))}
+    </>
+  )}
+</select>
+
+  
+<button
+  onClick={() => loadManifestDetails(selectedManifest)}
+  disabled={!selectedManifest}
+  style={{
+    ...buttonStyle,
+    backgroundColor: !selectedManifest ? '#F3F4F6' : '#2563EB',
+    color: !selectedManifest ? '#9CA3AF' : 'white',
+    marginTop: '8px',
+    width: '100%',
+    cursor: !selectedManifest ? 'not-allowed' : 'pointer'
+  }}
+>
+  <Package size={16} />
+  <span>View Manifest Details</span>
+</button>
+</div>
 
             {/* User Setup and Controls */}
             <div style={{ 
@@ -1033,7 +1093,155 @@ const ScanParcels = () => {
               maxHeight: '500px',
               overflowY: 'auto'
             }}>
-              {/* ... (keep your existing recent scans list) ... */}
+              {recentScans.length === 0 ? (
+  <div style={{ 
+    padding: '32px 24px', 
+    textAlign: 'center',
+    color: '#6B7280',
+    fontSize: '14px'
+  }}>
+    <Package style={{ 
+      width: '48px', 
+      height: '48px', 
+      color: '#E5E7EB',
+      marginBottom: '12px'
+    }} />
+    <p style={{ fontWeight: '500' }}>No scans yet</p>
+    <p>Start scanning to see activity here</p>
+  </div>
+) : (
+  <table style={{ 
+    width: '100%', 
+    borderCollapse: 'collapse',
+    tableLayout: 'fixed'
+  }}>
+    <thead style={{ 
+      backgroundColor: '#F9FAFB',
+      position: 'sticky',
+      top: 0,
+      zIndex: 10
+    }}>
+      <tr>
+        <th style={{ 
+          padding: '12px 16px',
+          textAlign: 'left',
+          fontSize: '12px',
+          fontWeight: '500',
+          color: '#6B7280',
+          borderBottom: '1px solid #E5E7EB',
+          width: '30%'
+        }}>
+          Tracking Number
+        </th>
+        <th style={{ 
+          padding: '12px 16px',
+          textAlign: 'left',
+          fontSize: '12px',
+          fontWeight: '500',
+          color: '#6B7280',
+          borderBottom: '1px solid #E5E7EB',
+          width: '25%'
+        }}>
+          Customer
+        </th>
+        <th style={{ 
+          padding: '12px 16px',
+          textAlign: 'left',
+          fontSize: '12px',
+          fontWeight: '500',
+          color: '#6B7280',
+          borderBottom: '1px solid #E5E7EB',
+          width: '20%'
+        }}>
+          Time
+        </th>
+        <th style={{ 
+          padding: '12px 16px',
+          textAlign: 'left',
+          fontSize: '12px',
+          fontWeight: '500',
+          color: '#6B7280',
+          borderBottom: '1px solid #E5E7EB',
+          width: '25%'
+        }}>
+          Status
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {recentScans.map((scan) => {
+        const customerName = extractCustomerName(scan.trackingNumber);
+        const isMultiParcel = customerName && isMultiParcelCustomer(scan.trackingNumber);
+        const statusStyle = getStatusColor(scan.status, scan.trackingNumber);
+        
+        return (
+          <tr 
+            key={scan.id} 
+            style={{ 
+              borderBottom: '1px solid #E5E7EB',
+              ':hover': { backgroundColor: '#F9FAFB' }
+            }}
+          >
+            <td style={{ 
+              padding: '16px',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#111827',
+              wordBreak: 'break-word'
+            }}>
+              {scan.trackingNumber}
+            </td>
+            <td style={{ 
+              padding: '16px',
+              fontSize: '14px',
+              color: '#6B7280',
+              wordBreak: 'break-word'
+            }}>
+              {customerName || 'Unknown'}
+              {isMultiParcel && (
+                <span style={{ 
+                  display: 'inline-block',
+                  marginLeft: '8px',
+                  backgroundColor: '#EDE9FE',
+                  color: '#5B21B6',
+                  padding: '2px 6px',
+                  borderRadius: '9999px',
+                  fontSize: '12px',
+                  fontWeight: '500'
+                }}>
+                  Multi
+                </span>
+              )}
+            </td>
+            <td style={{ 
+              padding: '16px',
+              fontSize: '14px',
+              color: '#6B7280'
+            }}>
+              {new Date(scan.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </td>
+            <td style={{ padding: '16px' }}>
+              <div style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                border: `1px solid ${statusStyle.borderColor}`,
+                backgroundColor: statusStyle.backgroundColor,
+                color: statusStyle.color,
+                fontSize: '14px'
+              }}>
+                {getStatusIcon(scan.status)}
+                <span>{scan.message}</span>
+              </div>
+            </td>
+          </tr>
+        );
+      })}
+    </tbody>
+  </table>
+)}
             </div>
           </div>
 
@@ -1116,42 +1324,58 @@ const ScanParcels = () => {
                   </th>
                 </tr>
               </thead>
-              <tbody style={{ backgroundColor: 'white' }}>
-                {customerStats.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" style={{ padding: '32px 24px', textAlign: 'center' }}>
-                      {isLoadingStats ? (
-                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                          <RefreshCw style={{ 
-                            width: '20px',
-                            height: '20px',
-                            color: '#9CA3AF',
-                            animation: 'spin 1s linear infinite'
-                          }} />
-                        </div>
-                      ) : (
-                        <>
-                          <h3 style={{ 
-                            marginTop: '8px',
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            color: '#111827'
-                          }}>
-                            No customer data
-                          </h3>
-                          <p style={{ 
-                            marginTop: '4px',
-                            fontSize: '14px',
-                            color: '#6B7280'
-                          }}>
-                            Start scanning to see statistics appear here.
-                          </p>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ) : (
-                  customerStats.map((stat, index) => (
+ <tbody style={{ backgroundColor: 'white' }}>
+  {!selectedManifest ? (
+    <tr>
+      <td colSpan="4" style={{ padding: '32px 24px', textAlign: 'center' }}>
+        <h3 style={{ 
+          marginTop: '8px',
+          fontSize: '14px',
+          fontWeight: '500',
+          color: '#111827'
+        }}>
+          No manifest selected
+        </h3>
+        <p style={{ 
+          marginTop: '4px',
+          fontSize: '14px',
+          color: '#6B7280'
+        }}>
+          Please select a manifest to view customer statistics
+        </p>
+      </td>
+    </tr>
+  ) : isLoadingStats ? (
+    <tr>
+      <td colSpan="4" style={{ padding: '24px', textAlign: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
+          <RefreshCw className="animate-spin" size={16} />
+          <span>Loading customer statistics...</span>
+        </div>
+      </td>
+    </tr>
+  ) : customerStats.length === 0 ? (
+    <tr>
+      <td colSpan="4" style={{ padding: '32px 24px', textAlign: 'center' }}>
+        <h3 style={{ 
+          marginTop: '8px',
+          fontSize: '14px',
+          fontWeight: '500',
+          color: '#111827'
+        }}>
+          No customer data found
+        </h3>
+        <p style={{ 
+          marginTop: '4px',
+          fontSize: '14px',
+          color: '#6B7280'
+        }}>
+          No parcels found in manifest {selectedManifest}
+        </p>
+      </td>
+    </tr>
+  ) : (
+    customerStats.map((stat, index) => (
                     <tr key={index} style={{ 
                       borderBottom: '1px solid #E5E7EB',
                       transition: 'background-color 0.2s',
