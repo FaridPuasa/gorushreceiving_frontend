@@ -123,19 +123,6 @@ const Upload = () => {
           </label>
         </div>
 
-                <div style={styles.manifestNumberContainer}>
-          <label style={styles.manifestNumberLabel}>
-            Product:
-            <input
-              type="text"
-              value={product}
-              onChange={(e) => setProduct(e.target.value)}
-              style={styles.manifestNumberInput}
-              placeholder="Enter product type"
-            />
-          </label>
-        </div>
-
         {/* Data Table - Virtualized for performance with large datasets */}
         <div style={styles.tableWrapper}>
           <div style={styles.tableContainer}>
