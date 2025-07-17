@@ -5,7 +5,6 @@ const Upload = () => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [manifestNumber, setManifestNumber] = useState('');
-  const [product, setProduct] = useState('');
 
   const expectedHeaders = [
     'Tracking Number', 'Shipment Date', 'AWB Number', 'Consignee Name', 
@@ -46,6 +45,7 @@ const Upload = () => {
   };
 
   const handleSubmit = async () => {
+    // Filter out completely empty rows (where all fields are empty)
     const dataToSubmit = tableData.filter(row => 
       Object.values(row).some(value => value !== undefined && value !== '')
     );
@@ -64,8 +64,7 @@ const Upload = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           tableData: dataToSubmit,
-          manifestNumber: manifestNumber.trim() || null,
-          product: product.trim() || null
+          manifestNumber: manifestNumber.trim() || null // Send null if empty
         })
       });
 
@@ -89,7 +88,6 @@ const Upload = () => {
   const handleClear = () => {
     setTableData([{}]);
     setManifestNumber('');
-    setProduct('');
     setMessage('');
   };
 
