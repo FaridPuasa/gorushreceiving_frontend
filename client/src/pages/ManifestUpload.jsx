@@ -50,6 +50,11 @@ const Upload = () => {
       Object.values(row).some(value => value !== undefined && value !== '')
     );
 
+      console.log('Submitting data:', { 
+    tableData: dataToSubmit,
+    manifestNumber 
+  });
+
     if (dataToSubmit.length === 0) {
       setMessage('No data to upload');
       return;
