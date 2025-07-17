@@ -1,1026 +1,1491 @@
-require('dotenv').config();
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
+import React, { useEffect, useState, useRef } from 'react';
+import { Pause, Play, Package, CheckCircle, AlertCircle, Wifi, WifiOff, User, RefreshCw, AlertTriangle, X } from 'lucide-react';
 
-const app = express();
-const axios = require('axios');
+const ScanParcels = () => {
+  const [isScanning, setIsScanning] = useState(false);
+  const [recentScans, setRecentScans] = useState([]);
+  const [customerStats, setCustomerStats] = useState([]);
+  const [userId] = useState(`scanner_${Math.random().toString(36).substr(2, 9)}`);
+  const [userName, setUserName] = useState('');
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingScans, setPendingScans] = useState([]);
+  const [scanCount, setScanCount] = useState(0);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const [scanInput, setScanInput] = useState('');
+  const [showMultiParcelWarning, setShowMultiParcelWarning] = useState(false);
+  const [currentCustomer, setCurrentCustomer] = useState(null);
+  const [customerParcelCount, setCustomerParcelCount] = useState(0);
+  const [pendingScanData, setPendingScanData] = useState(null);
+  const [manifests, setManifests] = useState([]);
+  const [selectedManifest, setSelectedManifest] = useState('');
+  const [manifestDetails, setManifestDetails] = useState(null);
+  const [viewMode, setViewMode] = useState('scan');
+  
+  const inputRef = useRef(null);
+  const scanBuffer = useRef('');
+  const scanTimeout = useRef(null);
 
-// === CORS SETUP ===
-const allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'https://grscanningsystem.vercel.app'];
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    } else {
-      return callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
-}));
-
-// === BODY PARSER ===
-app.use(express.json({ limit: '10mb' }));
-
-const parseDate = (dateString) => {
-  if (!dateString || typeof dateString !== 'string') {
-    return null;
+  useEffect(() => {
+  if (selectedManifest) {
+    fetchCustomerStats(selectedManifest);
   }
-  
-  // Remove any extra whitespace
-  const cleanDateString = dateString.trim();
-  
-  // Handle DD/MM/YYYY format (common in many countries)
-  const ddmmyyyyPattern = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-  const ddmmyyyyMatch = cleanDateString.match(ddmmyyyyPattern);
-  
-  if (ddmmyyyyMatch) {
-    const [, day, month, year] = ddmmyyyyMatch;
-    // Create date in YYYY-MM-DD format for reliable parsing
-    const isoString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    const date = new Date(isoString);
-    
-    // Validate the date is actually valid
-    if (!isNaN(date.getTime())) {
-      return date;
-    }
+}, [selectedManifest]);
+
+useEffect(() => {
+  if (!selectedManifest) {
+    setCustomerStats([]); // Clear stats when no manifest selected
+    return;
   }
+
   
-  // Handle MM/DD/YYYY format
-  const mmddyyyyPattern = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-  const mmddyyyyMatch = cleanDateString.match(mmddyyyyPattern);
-  
-  if (mmddyyyyMatch) {
-    const [, month, day, year] = mmddyyyyMatch;
-    // Create date in YYYY-MM-DD format for reliable parsing
-    const isoString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    const date = new Date(isoString);
-    
-    // Validate the date is actually valid
-    if (!isNaN(date.getTime())) {
-      return date;
-    }
-  }
-  
-  // Handle YYYY-MM-DD format (ISO format)
-  const yyyymmddPattern = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
-  const yyyymmddMatch = cleanDateString.match(yyyymmddPattern);
-  
-  if (yyyymmddMatch) {
-    const date = new Date(cleanDateString);
-    if (!isNaN(date.getTime())) {
-      return date;
-    }
-  }
-  
-  // Try native Date parsing as fallback
-  const fallbackDate = new Date(cleanDateString);
-  if (!isNaN(fallbackDate.getTime())) {
-    return fallbackDate;
-  }
-  
-  // If all parsing attempts fail, return null
-  console.warn(`Could not parse date: "${dateString}"`);
-  return null;
-};
 
-// === CONNECT TO MONGODB ===
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/testdb', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log('✅ MongoDB connected'))
-.catch(err => console.error('❌ MongoDB connection error:', err));
-
-const parcelSchema = new mongoose.Schema({
-  trackingNumber: { type: String, required: true, unique: true },
-  consigneeName: { type: String, required: true },
-  shipmentDate: Date,
-  awbNumber: String,
-  consigneePhone: String,
-  consigneeEmail: String,
-  consigneeAddress: String,
-  zipCode: String,
-  description: String,
-  actualWeight: Number,
-  declaredValue: Number,
-  manifestNumber: String,
-  received: { type: Boolean, default: false },
-  receivedAt: Date,
-  receivedBy: String,
-  // NEW: Multi-user support
-  scannedBy: String,
-  scannedByUser: String,
-  scanHistory: [{
-    userId: String,
-    userName: String,
-    timestamp: Date,
-    action: String // 'scanned', 'received', 'updated'
-  }],
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-});
-
-// Add scan session tracking
-const scanSessionSchema = new mongoose.Schema({
-  userId: { type: String, required: true },
-  userName: String,
-  startTime: { type: Date, default: Date.now },
-  endTime: Date,
-  totalScans: { type: Number, default: 0 },
-  successfulScans: { type: Number, default: 0 },
-  errorScans: { type: Number, default: 0 },
-  isActive: { type: Boolean, default: true }
-});
-
-const ScanSession = mongoose.model('ScanSession', scanSessionSchema);
-
-const manifestSchema = new mongoose.Schema({
-  manifestNumber: { type: String, required: true, unique: true },
-  date: { type: Date, default: Date.now },
-  parcels: [parcelSchema],
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-});
-
-// Only create Manifest model - no separate Parcel model
-const Manifest = mongoose.model('Manifest', manifestSchema);
-
-const mapParcelData = (frontendData) => {
-  return {
-    trackingNumber: frontendData['Tracking Number'],
-    consigneeName: frontendData['Consignee Name'],
-    shipmentDate: parseDate(frontendData['Shipment Date']), // Use safe date parsing
-    awbNumber: frontendData['AWB Number'],
-    consigneePhone: frontendData['Consignee Phone Number'],
-    consigneeEmail: frontendData['Consignee Email'],
-    consigneeAddress: frontendData['Consignee Address'],
-    zipCode: frontendData['Zip Code'],
-    description: frontendData['Description'],
-    actualWeight: frontendData['Actual Weight'] ? parseFloat(frontendData['Actual Weight']) : null,
-    declaredValue: frontendData['Declared Value (USD)'] ? parseFloat(frontendData['Declared Value (USD)']) : null,
-    updatedAt: new Date()
-  };
-};
-
-app.post('/api/manifest/paste', async (req, res) => {
-  try {
-    const { tableData, manifestNumber } = req.body;
-
-    if (!tableData || !Array.isArray(tableData) || tableData.length === 0) {
-      return res.status(400).json({ error: 'No parcel data provided' });
-    }
-
-    if (!manifestNumber) {
-      return res.status(400).json({ error: 'Manifest number is required' });
-    }
-
-    console.log(`Processing manifest ${manifestNumber} with ${tableData.length} parcels...`);
-
-    const results = {
-      created: 0,
-      updated: 0,
-      errors: []
-    };
-
-    const parcels = [];
-
-    // Process each parcel
-    for (let i = 0; i < tableData.length; i++) {
-      const frontendParcel = tableData[i];
-      
-      try {
-        // Map frontend data to backend schema
-        const mappedData = mapParcelData(frontendParcel);
-
-        // Validate required fields
-        if (!mappedData.trackingNumber || !mappedData.consigneeName) {
-          results.errors.push(`Row ${i + 1}: Missing tracking number or consignee name`);
-          continue;
-        }
-
-        // Log date parsing for debugging
-        if (frontendParcel['Shipment Date']) {
-          console.log(`Row ${i + 1}: Original date "${frontendParcel['Shipment Date']}" parsed as: ${mappedData.shipmentDate}`);
-        }
-
-        // Add to parcels array for the manifest
-        parcels.push(mappedData);
-
-      } catch (error) {
-        console.error(`Error processing parcel ${i + 1}:`, error);
-        results.errors.push(`Row ${i + 1}: ${error.message}`);
-      }
-    }
-
-    // Create or update the manifest with better error handling
+  const fetchCustomerStats = async () => {
+    setIsLoadingStats(true);
     try {
-      const existingManifest = await Manifest.findOne({ manifestNumber });
-      
-      if (existingManifest) {
-        // Check for duplicate tracking numbers within the manifest
-        const newParcels = [];
-        
-        for (const parcel of parcels) {
-          const existingParcelIndex = existingManifest.parcels.findIndex(
-            p => p.trackingNumber === parcel.trackingNumber
-          );
-          
-          if (existingParcelIndex !== -1) {
-            // Update existing parcel within manifest
-            existingManifest.parcels[existingParcelIndex] = parcel;
-            results.updated++;
-          } else {
-            // Add new parcel to manifest
-            newParcels.push(parcel);
-            results.created++;
-          }
-        }
-        
-        // Add new parcels to existing manifest
-        existingManifest.parcels.push(...newParcels);
-        existingManifest.updatedAt = new Date();
-        
-        // Save with validation error handling
-        await existingManifest.save();
-        
-      } else {
-        // Create new manifest with all parcels
-        const newManifest = new Manifest({
-          manifestNumber,
-          parcels,
-          updatedAt: new Date()
-        });
-        
-        // Save with validation error handling
-        await newManifest.save();
-        results.created = parcels.length;
+      const res = await fetch(`https://grscanningsystemserver.onrender.com/api/stats/customers?manifest=${encodeURIComponent(selectedManifest)}`);
+      const data = await res.json();
+      if (data.success) {
+        setCustomerStats(data.stats);
       }
     } catch (error) {
-      console.error('Error processing manifest:', error);
-      
-      // Check if it's a validation error and provide more specific feedback
-      if (error.name === 'ValidationError') {
-        const validationErrors = Object.keys(error.errors).map(key => {
-          const err = error.errors[key];
-          if (err.kind === 'date') {
-            return `${key}: Invalid date format. Please use DD/MM/YYYY format.`;
-          }
-          return `${key}: ${err.message}`;
-        });
-        results.errors.push(...validationErrors);
-      } else {
-        results.errors.push(`Manifest error: ${error.message}`);
+      console.error('Failed to fetch customer stats:', error);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+
+  fetchCustomerStats();
+}, [selectedManifest]);
+
+
+
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      processPendingScans();
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+ const isMultiParcelCustomer = (trackingNumber) => {
+  const customerName = extractCustomerName(trackingNumber);
+  if (!customerName) return false;
+  
+  const customerStat = customerStats.find(stat => stat._id === customerName);
+  return customerStat && customerStat.parcelCount > 1;
+};
+const sortedManifests = [...manifests].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+
+useEffect(() => {
+  const loadManifests = async () => {
+    try {
+      const res = await fetch('https://grscanningsystemserver.onrender.com/api/manifests/scan-stats');
+      const data = await res.json();
+      if (data.success) {
+        // Sort manifests by date (newest first)
+        const sortedManifests = [...data.manifests].sort((a, b) => 
+          new Date(b.date) - new Date(a.date)
+        );
+        
+        setManifests(sortedManifests);
+        
+        // Automatically select the first manifest if available
+        if (sortedManifests.length > 0) {
+          setSelectedManifest(sortedManifests[0].manifestNumber);
+        }
       }
+    } catch (error) {
+      console.error('Failed to load manifests:', error);
+    }
+  };
+
+  loadManifests();
+}, []);
+
+useEffect(() => {
+  const handleKeyPress = (e) => {
+    if (!isScanning) return;
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+
+      // Clear timeout to prevent double processing
+      if (scanTimeout.current) {
+        clearTimeout(scanTimeout.current);
+        scanTimeout.current = null;
+      }
+
+      if (scanBuffer.current.length > 0) {
+        handleAutoScan(scanBuffer.current.trim());
+        scanBuffer.current = '';
+      }
+      return;
     }
 
-    // Prepare response
-    const total = results.created + results.updated;
-    let message = `Successfully processed manifest ${manifestNumber} with ${total} parcels`;
-    
-    if (results.created > 0) {
-      message += ` (${results.created} created`;
+    if (e.key.length === 1) {
+      scanBuffer.current += e.key;
     }
-    if (results.updated > 0) {
-      message += `${results.created > 0 ? ', ' : ' ('}${results.updated} updated`;
-    }
-    if (results.created > 0 || results.updated > 0) {
-      message += ')';
-    }
+  };
 
-    if (results.errors.length > 0) {
-      message += `. ${results.errors.length} errors occurred.`;
-    }
-
-    res.json({ 
-      success: true, 
-      message,
-      total,
-      created: results.created,
-      updated: results.updated,
-      errors: results.errors
-    });
-
-  } catch (error) {
-    console.error('Error processing manifest:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.post('/api/scan', async (req, res) => {
-  const { trackingNumber, userId, userName, timestamp, manifestNumber } = req.body;
-
-  if (!trackingNumber) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Tracking number is required' 
-    });
+  if (isScanning) {
+    document.addEventListener('keypress', handleKeyPress);
+    inputRef.current?.focus();
   }
 
+  return () => {
+    document.removeEventListener('keypress', handleKeyPress);
+    if (scanTimeout.current) {
+      clearTimeout(scanTimeout.current);
+      scanTimeout.current = null;
+    }
+  };
+}, [isScanning]);
+
+
+  // Load initial data
+  useEffect(() => {
+    fetchCustomerStats();
+    loadUserName();
+  }, []);
+
+  const loadUserName = () => {
+    const saved = localStorage.getItem('scannerUserName');
+    if (saved) {
+      setUserName(saved);
+    }
+  };
+
+  const saveUserName = (name) => {
+    setUserName(name);
+    localStorage.setItem('scannerUserName', name);
+  };
+
+
+
+  useEffect(() => {
+    if (!selectedManifest) {
+      setCustomerStats([]);
+      return;
+    }
+
+    fetchCustomerStats(selectedManifest);
+  }, [selectedManifest]);
+
+const fetchCustomerStats = async (manifestNumber = null) => {
+  setIsLoadingStats(true);
+  
   try {
-    // Find parcel across all manifests
-    const manifest = await Manifest.findOne({ 
-      'parcels.trackingNumber': trackingNumber 
-    });
-
-    if (!manifest) {
-      // Log failed scan attempt
-      await logScanAttempt(userId, userName, trackingNumber, 'not_found');
-      return res.status(404).json({ 
-        success: false, 
-        message: '❌ Parcel not found in any manifest' 
-      });
+    // Don't fetch if no manifest is selected
+    if (!manifestNumber && !selectedManifest) {
+      setCustomerStats([]);
+      return;
     }
 
-    const parcelIndex = manifest.parcels.findIndex(
-      p => p.trackingNumber === trackingNumber
-    );
-
-    if (parcelIndex === -1) {
-      await logScanAttempt(userId, userName, trackingNumber, 'not_found');
-      return res.status(404).json({ 
-        success: false, 
-        message: '❌ Parcel not found' 
-      });
-    }
-
-    const parcel = manifest.parcels[parcelIndex];
-
-    if (parcel.received) {
-      await logScanAttempt(userId, userName, trackingNumber, 'already_received');
-      return res.status(409).json({ 
-        success: false, 
-        message: `⚠️ Already received by ${parcel.receivedBy || 'unknown'} on ${parcel.receivedAt ? new Date(parcel.receivedAt).toLocaleString() : 'unknown date'}` 
-      });
-    }
-
-    // Three-step Detrack status updates with delays
-    const detrackResults = {
-      customClearing: { success: false, error: null, details: null },
-      atWarehouse: { success: false, error: null, details: null },
-      inSortingArea: { success: false, error: null, details: null }
-    };
-
-    // Step 1: Custom Clearing
-    console.log(`Updating Detrack status to "Custom Clearing" for ${trackingNumber}`);
-    const detrackResponse1 = await updateDetrackStatus(trackingNumber, 'Custom Clearing');
-    detrackResults.customClearing = {
-      success: detrackResponse1.success,
-      error: detrackResponse1.error,
-      details: detrackResponse1.details
-    };
-
-    if (!detrackResponse1.success) {
-      console.error('Failed to update Detrack status to "Custom Clearing":', detrackResponse1.error);
-      // Continue with the scan even if Detrack update fails
-    }
-
-    // Update parcel as received (moved before the async scheduling)
-    manifest.parcels[parcelIndex].received = true;
-    manifest.parcels[parcelIndex].receivedAt = new Date(timestamp || Date.now());
-    manifest.parcels[parcelIndex].receivedBy = userName || userId;
-    manifest.parcels[parcelIndex].scannedBy = userId;
-    manifest.parcels[parcelIndex].scannedByUser = userName;
-    manifest.parcels[parcelIndex].updatedAt = new Date();
-
-    // Add to scan history
-    if (!manifest.parcels[parcelIndex].scanHistory) {
-      manifest.parcels[parcelIndex].scanHistory = [];
-    }
-    manifest.parcels[parcelIndex].scanHistory.push({
-      userId: userId,
-      userName: userName,
-      timestamp: new Date(timestamp || Date.now()),
-      action: 'received'
-    });
-
-    await manifest.save();
-
-    // Update scan session
-    await updateScanSession(userId, userName, true);
-
-    // Log successful scan
-    await logScanAttempt(userId, userName, trackingNumber, 'success');
-
-    // Generate random delay between 20-40 minutes (in milliseconds)
-    const minDelay = 20 * 60 * 1000; // 20 minutes in milliseconds
-    const maxDelay = 40 * 60 * 1000; // 40 minutes in milliseconds
-    const randomDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+    const manifestToFetch = manifestNumber || selectedManifest;
+    const res = await fetch(`https://grscanningsystemserver.onrender.com/api/stats/customers?manifest=${encodeURIComponent(manifestToFetch)}`);
     
-    console.log(`Waiting ${Math.round(randomDelay / 60000)} minutes before updating to "At Warehouse" for ${trackingNumber}`);
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+
+    const data = await res.json();
     
-    // Schedule the "At Warehouse" update with random delay
-    setTimeout(async () => {
+    if (data.success && Array.isArray(data.stats)) {
+      setCustomerStats(data.stats);
+    } else {
+      setCustomerStats([]);
+    }
+  } catch (error) {
+    console.error('Failed to fetch customer stats:', error);
+    setCustomerStats([]);
+  } finally {
+    setIsLoadingStats(false);
+  }
+};
+
+  const processPendingScans = async () => {
+    if (pendingScans.length === 0) return;
+
+    const scansToProcess = [...pendingScans];
+    setPendingScans([]);
+
+    for (const scan of scansToProcess) {
       try {
-        console.log(`Updating Detrack status to "At Warehouse" for ${trackingNumber} (after ${Math.round(randomDelay / 60000)} minute delay)`);
-        const detrackResponse2 = await updateDetrackStatus(trackingNumber, 'At Warehouse');
-        
-        if (!detrackResponse2.success) {
-          console.error('Failed to update Detrack status to "At Warehouse":', detrackResponse2.error);
-        } else {
-          console.log(`Successfully updated ${trackingNumber} to "At Warehouse"`);
-        }
-        
-        // Add another delay before "In Sorting Area"
-        setTimeout(async () => {
-          try {
-            console.log(`Updating Detrack status to "In Sorting Area" for ${trackingNumber}`);
-            const detrackResponse3 = await updateDetrackStatus(trackingNumber, 'In Sorting Area');
-            
-            if (!detrackResponse3.success) {
-              console.error('Failed to update Detrack status to "In Sorting Area":', detrackResponse3.error);
-            } else {
-              console.log(`Successfully updated ${trackingNumber} to "In Sorting Area"`);
-            }
-          } catch (error) {
-            console.error('Error in delayed "In Sorting Area" update:', error);
-          }
-        }, 1000); // 1 second delay between At Warehouse and In Sorting Area
-        
+        await submitScan(scan.trackingNumber, scan.timestamp);
+        updateRecentScan(scan.id, { status: 'success', message: 'Synced successfully' });
       } catch (error) {
-        console.error('Error in delayed "At Warehouse" update:', error);
+        setPendingScans(prev => [...prev, scan]);
+        updateRecentScan(scan.id, { status: 'error', message: 'Sync failed' });
       }
-    }, randomDelay);
-
-    // Remove the synchronous "At Warehouse" and "In Sorting Area" updates since they're now scheduled
-    // Step 2: At Warehouse (now handled asynchronously above)
-    // Step 3: In Sorting Area (now handled asynchronously above)
-    // Update response structure - only Custom Clearing is immediate, others are scheduled
-    res.json({ 
-      success: true, 
-      message: '✅ Parcel received successfully',
-      detrackUpdates: {
-        customClearing: detrackResults.customClearing,
-        atWarehouse: { 
-          success: null, 
-          scheduled: true, 
-          delayMinutes: Math.round(randomDelay / 60000),
-          message: `Scheduled to update in ${Math.round(randomDelay / 60000)} minutes`
-        },
-        inSortingArea: { 
-          success: null, 
-          scheduled: true, 
-          message: `Scheduled to update after At Warehouse + 1 second`
-        }
-      },
-      parcel: {
-        ...manifest.parcels[parcelIndex].toObject(),
-        manifestNumber: manifest.manifestNumber
-      }
-    });
-
-  } catch (err) {
-    console.error('Scan error:', err);
-    await logScanAttempt(userId, userName, trackingNumber, 'error');
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error occurred' 
-    });
-  }
-});
-
-async function updateDetrackStatus(trackingNumber, status) {
-  try {
-    const detrackApiKey = process.env.DETRACK_API_KEY;
-    const detrackEndpoint = `https://app.detrack.com/api/v2/dn/jobs/update/?do_number=${trackingNumber}`;
-    
-    if (!detrackApiKey) {
-      console.warn('DETRACK_API_KEY not configured, skipping Detrack update');
-      return { success: false, error: 'API key not configured' };
     }
-    
-    // Map your internal status to Detrack's expected format
-    const statusMapping = {
-      'At Warehouse': {
-        tracking_status: 'At Warehouse',
-        status: 'at_warehouse'
-      },
-      'In Sorting Area': {
-        tracking_status: 'In Sorting Area', 
-        status: 'in_sorting_area'
-      },
-      'Custom Clearing': {
-        tracking_status: 'Custom Clearing',
-        status: 'custom_clearing'
-      },
-      'Out for Delivery': {
-        tracking_status: 'Out for Delivery',
-        status: 'out_for_delivery'
-      },
-      'Delivered': {
-        tracking_status: 'Delivered',
-        status: 'delivered'
-      }
-    };
+  };
 
-    const mappedStatus = statusMapping[status];
-    if (!mappedStatus) {
-      console.warn(`Unknown status: ${status}, using default`);
-      // Use the original status as fallback
-      mappedStatus = {
-        tracking_status: status,
-        status: status.toLowerCase().replace(/\s+/g, '_')
+const submitScan = async (trackingNumber, timestamp) => {
+  try {
+    const response = await fetch('https://grscanningsystemserver.onrender.com/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        trackingNumber,
+        userId,
+        userName,
+        timestamp,
+        manifestNumber: selectedManifest
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Scan failed');
+    }
+
+    const result = await response.json();
+    
+    // Handle case where parcel wasn't found in manifest
+    if (result.status === 'not_found') {
+      return {
+        ...result,
+        message: result.message || 'Parcel not in manifest - added as extra'
       };
     }
-    
-    // Use the correct payload format that Detrack expects
-    const payload = {
-      do_number: trackingNumber,
-      data: {
-        tracking_status: mappedStatus.tracking_status,
-        status: mappedStatus.status
-      },
-      timestamp: new Date().toISOString()
-    };
 
-    console.log(`Updating Detrack status for ${trackingNumber}:`, payload);
-    
-    const response = await axios.put(detrackEndpoint, payload, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-KEY': detrackApiKey
-      }
-    });
-
-    console.log(`Detrack update successful for ${trackingNumber}:`, response.data);
-    return { success: true, data: response.data };
-    
+    return result;
   } catch (error) {
-    console.error('Error updating Detrack status:', error);
-    
-    if (error.response) {
-      console.error('Detrack API error response:', error.response.data);
-      return { 
-        success: false, 
-        error: error.response.data?.message || 'Detrack API error',
-        details: error.response.data
-      };
-    } else if (error.request) {
-      return { success: false, error: 'No response from Detrack API' };
-    } else {
-      return { success: false, error: error.message };
-    }
+    throw error;
   }
-}
+};
 
-app.get('/api/manifests/:manifestNumber/scans', async (req, res) => {
-  try {
-    const manifest = await Manifest.findOne({ 
-      manifestNumber: req.params.manifestNumber 
+const extractCustomerName = (trackingNumber) => {
+  // Find the customer by looking for the tracking number in their tracking numbers array
+  const customer = customerStats.find(stat => {
+    // Check if this tracking number belongs to this customer
+    return stat.trackingNumbers && stat.trackingNumbers.includes(trackingNumber);
+  });
+  
+  return customer ? customer._id : null; // _id contains the customer name
+};
+
+const handleAutoScan = async (scannedNumber) => {
+  if (!scannedNumber || scannedNumber.length < 3) return;
+
+  const scanData = {
+      scannedNumber,
+      timestamp: new Date().toISOString(),
+      scanId: Date.now(),
+      manifestNumber: selectedManifest
+    };
+
+  const customerName = extractCustomerName(scannedNumber);
+  if (!customerName) {
+    // If customer not found, proceed with normal scan
+    processScan(scannedNumber, new Date().toISOString(), Date.now());
+    return;
+  }
+
+  const customerStat = customerStats.find(stat => stat._id === customerName);
+  
+  if (customerStat && customerStat.parcelCount > 1) {
+    // Show warning and pause processing
+    setCurrentCustomer(customerName); // Now using the actual customer name
+    setCustomerParcelCount(customerStat.parcelCount);
+    setPendingScanData({
+      scannedNumber,
+      timestamp: new Date().toISOString(),
+      scanId: Date.now()
     });
+    setShowMultiParcelWarning(true);
+    return;
+  }
 
-    if (!manifest) {
-      return res.status(404).json({ error: 'Manifest not found' });
-    }
+  // Proceed with normal scan if no warning needed
+  processScan(scannedNumber, new Date().toISOString(), Date.now());
+};
 
-    // Get all received parcels from this manifest
-    const receivedParcels = manifest.parcels.filter(p => p.received);
+const processScan = async (scannedNumber, timestamp, scanId) => {
+  const newScan = {
+    id: scanId,
+    trackingNumber: scannedNumber,
+    timestamp,
+    status: 'processing',
+    message: 'Processing...',
+    user: userName || userId
+  };
 
-    // Get scan activity for this manifest
-    const scanActivity = [];
-    manifest.parcels.forEach(parcel => {
-      if (parcel.scanHistory) {
-        parcel.scanHistory.forEach(scan => {
-          scanActivity.push({
-            trackingNumber: parcel.trackingNumber,
-            consigneeName: parcel.consigneeName,
-            action: scan.action,
-            timestamp: scan.timestamp,
-            user: scan.userName || scan.userId,
-            received: parcel.received
-          });
+  setRecentScans(prev => [newScan, ...prev.slice(0, 19)]);
+  setScanCount(prev => prev + 1);
+
+  try {
+    if (isOnline) {
+      const result = await submitScan(scannedNumber, timestamp);
+      
+      // Special handling for parcels not in manifest
+      if (result.status === 'not_found') {
+        updateRecentScan(scanId, { 
+          status: 'warning',
+          message: result.message || 'Parcel not in manifest'
         });
-      }
-    });
-
-    // Sort by timestamp
-    scanActivity.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-    res.json({
-      success: true,
-      manifestNumber: manifest.manifestNumber,
-      date: manifest.date,
-      totalParcels: manifest.parcels.length,
-      receivedParcels: receivedParcels.length,
-      scanActivity,
-      parcels: manifest.parcels.map(p => ({
-        trackingNumber: p.trackingNumber,
-        consigneeName: p.consigneeName,
-        received: p.received,
-        receivedAt: p.receivedAt,
-        receivedBy: p.receivedBy
-      }))
-    });
-  } catch (error) {
-    console.error('Error fetching manifest scan details:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.post('/api/scan/session', async (req, res) => {
-  const { userId, userName, action } = req.body;
-
-  try {
-    if (action === 'start') {
-      // End any existing active session
-      await ScanSession.updateMany(
-        { userId: userId, isActive: true },
-        { isActive: false, endTime: new Date() }
-      );
-
-      // Start new session
-      const newSession = new ScanSession({
-        userId: userId,
-        userName: userName
-      });
-      await newSession.save();
-
-      res.json({ success: true, message: 'Scanning session started' });
-    } else if (action === 'stop') {
-      await ScanSession.updateMany(
-        { userId: userId, isActive: true },
-        { isActive: false, endTime: new Date() }
-      );
-
-      res.json({ success: true, message: 'Scanning session ended' });
-    } else {
-      res.status(400).json({ error: 'Invalid action' });
-    }
-  } catch (error) {
-    console.error('Error managing scan session:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-async function updateScanSession(userId, userName, isSuccessful) {
-  try {
-    let session = await ScanSession.findOne({ 
-      userId: userId, 
-      isActive: true 
-    });
-
-    if (!session) {
-      session = new ScanSession({
-        userId: userId,
-        userName: userName,
-        totalScans: 1,
-        successfulScans: isSuccessful ? 1 : 0,
-        errorScans: isSuccessful ? 0 : 1
-      });
-    } else {
-      session.totalScans += 1;
-      if (isSuccessful) {
-        session.successfulScans += 1;
       } else {
-        session.errorScans += 1;
-      }
-      session.userName = userName || session.userName;
-    }
-
-    await session.save();
-  } catch (error) {
-    console.error('Error updating scan session:', error);
-  }
-}
-
-// Helper function to log scan attempts
-async function logScanAttempt(userId, userName, trackingNumber, result) {
-  try {
-    // You can implement detailed logging here
-    console.log(`Scan attempt: ${userName || userId} - ${trackingNumber} - ${result}`);
-  } catch (error) {
-    console.error('Error logging scan attempt:', error);
-  }
-}
-
-// Get real-time scanning statistics
-app.get('/api/stats/scanning', async (req, res) => {
-  try {
-    const activeSessions = await ScanSession.find({ isActive: true });
-    const totalStats = await ScanSession.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalScans: { $sum: '$totalScans' },
-          successfulScans: { $sum: '$successfulScans' },
-          errorScans: { $sum: '$errorScans' },
-          activeUsers: { $sum: { $cond: ['$isActive', 1, 0] } }
-        }
-      }
-    ]);
-
-    res.json({
-      success: true,
-      stats: {
-        activeSessions: activeSessions.length,
-        totalScans: totalStats[0]?.totalScans || 0,
-        successfulScans: totalStats[0]?.successfulScans || 0,
-        errorScans: totalStats[0]?.errorScans || 0,
-        activeUsers: activeSessions.map(s => ({
-          userId: s.userId,
-          userName: s.userName,
-          totalScans: s.totalScans,
-          successRate: s.totalScans > 0 ? ((s.successfulScans / s.totalScans) * 100).toFixed(1) : 0,
-          startTime: s.startTime
-        }))
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching scanning stats:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.get('/api/stats/customers', async (req, res) => {
-  try {
-    const { manifest: manifestNumber } = req.query;
-    
-    // Build query for manifests
-    const manifestQuery = manifestNumber ? { manifestNumber } : {};
-    const manifests = await Manifest.find(manifestQuery);
-
-    if (manifestNumber && manifests.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Manifest not found' 
-      });
-    }
-
-    const allParcels = [];
-    
-    manifests.forEach(manifest => {
-      manifest.parcels.forEach(parcel => {
-        allParcels.push({
-          ...parcel.toObject(),
-          manifestNumber: manifest.manifestNumber
+        updateRecentScan(scanId, { 
+          status: 'success', 
+          message: result.message || 'Scan successful' 
         });
-      });
-    });
-
-    const stats = allParcels.reduce((acc, parcel) => {
-      const customer = parcel.consigneeName;
-      const customerCode = parcel.trackingNumber.substring(0, 3).toUpperCase();
-      
-      if (!acc[customer]) {
-        acc[customer] = {
-          _id: customer,
-          customerCode: customerCode,
-          parcelCount: 0,
-          receivedCount: 0,
-          lastScanDate: null,
-          lastScannedBy: null,
-          trackingNumbers: [],
-          manifests: new Set() // Track which manifests this customer appears in
-        };
       }
       
-      acc[customer].parcelCount += 1;
-      acc[customer].trackingNumbers.push(parcel.trackingNumber);
-      acc[customer].manifests.add(parcel.manifestNumber);
-      
-      if (parcel.received) {
-        acc[customer].receivedCount += 1;
-        if (parcel.receivedAt && (!acc[customer].lastScanDate || parcel.receivedAt > acc[customer].lastScanDate)) {
-          acc[customer].lastScanDate = parcel.receivedAt;
-          acc[customer].lastScannedBy = parcel.scannedByUser || parcel.receivedBy;
-        }
-      }
-      
-      return acc;
-    }, {});
-
-    // Convert the stats object to an array and transform the Set to an array
-    const sortedStats = Object.values(stats)
-      .map(stat => ({
-        ...stat,
-        manifests: Array.from(stat.manifests) // Convert Set to array
-      }))
-      .sort((a, b) => b.parcelCount - a.parcelCount);
-
-    res.json({ 
-      success: true, 
-      stats: sortedStats,
-      manifestFilter: manifestNumber || 'all' 
-    });
-  } catch (error) {
-    console.error('Error fetching customer stats:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Internal server error' 
-    });
-  }
-});
-
-app.get('/api/activity', async (req, res) => {
-  try {
-    const { limit = 50, userId } = req.query;
-    
-    const manifests = await Manifest.find();
-    const activities = [];
-    
-    manifests.forEach(manifest => {
-      manifest.parcels.forEach(parcel => {
-        if (parcel.scanHistory && parcel.scanHistory.length > 0) {
-          parcel.scanHistory.forEach(scan => {
-            if (!userId || scan.userId === userId) {
-              activities.push({
-                trackingNumber: parcel.trackingNumber,
-                consigneeName: parcel.consigneeName,
-                userId: scan.userId,
-                userName: scan.userName,
-                timestamp: scan.timestamp,
-                action: scan.action,
-                manifestNumber: manifest.manifestNumber
-              });
-            }
-          });
-        }
+      fetchCustomerStats();
+    } else {
+      setPendingScans(prev => [...prev, { id: scanId, trackingNumber: scannedNumber, timestamp }]);
+      updateRecentScan(scanId, { 
+        status: 'pending', 
+        message: 'Queued for sync' 
       });
-    });
-
-    // Sort by timestamp (newest first) and limit
-    activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    const limitedActivities = activities.slice(0, parseInt(limit));
-
-    res.json({ success: true, activities: limitedActivities });
-  } catch (error) {
-    console.error('Error fetching activity log:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// === GET ALL MANIFESTS ROUTE ===
-app.get('/api/manifests', async (req, res) => {
-  try {
-    const manifests = await Manifest.find().sort({ createdAt: -1 });
-    res.json({ success: true, manifests });
-  } catch (error) {
-    console.error('Error fetching manifests:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.get('/api/manifests/scan-stats', async (req, res) => {
-  try {
-    const manifests = await Manifest.aggregate([
-      {
-        $project: {
-          manifestNumber: 1,
-          date: 1,
-          totalParcels: { $size: "$parcels" },
-          receivedParcels: {
-            $size: {
-              $filter: {
-                input: "$parcels",
-                as: "parcel",
-                cond: { $eq: ["$$parcel.received", true] }
-              }
-            }
-          }
-        }
-      },
-      { $sort: { date: -1 } }
-    ]);
-
-    res.json({ success: true, manifests });
-  } catch (error) {
-    console.error('Error fetching manifest stats:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// === GET SINGLE MANIFEST ROUTE ===
-app.get('/api/manifests/:manifestNumber', async (req, res) => {
-  try {
-    const manifest = await Manifest.findOne({ manifestNumber: req.params.manifestNumber });
-    
-    if (!manifest) {
-      return res.status(404).json({ error: 'Manifest not found' });
     }
-
-    res.json({ success: true, manifest });
   } catch (error) {
-    console.error('Error fetching manifest:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// === GET ALL PARCELS ROUTE (from all manifests) ===
-app.get('/api/parcels', async (req, res) => {
-  try {
-    const manifests = await Manifest.find();
-    const allParcels = [];
-    
-    // Flatten all parcels from all manifests
-    manifests.forEach(manifest => {
-      manifest.parcels.forEach(parcel => {
-        allParcels.push({
-          ...parcel.toObject(),
-          manifestNumber: manifest.manifestNumber,
-          manifestDate: manifest.date
-        });
-      });
+    updateRecentScan(scanId, { 
+      status: 'error', 
+      message: error.message 
     });
-    
-    // Sort by creation date (newest first)
-    allParcels.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    
-    res.json({ success: true, parcels: allParcels });
-  } catch (error) {
-    console.error('Error fetching parcels:', error);
-    res.status(500).json({ error: 'Internal server error' });
   }
-});
+};
 
-// === GET SINGLE PARCEL ROUTE (search across all manifests) ===
-app.get('/api/parcels/:trackingNumber', async (req, res) => {
-  try {
-    const manifest = await Manifest.findOne({ 
-      'parcels.trackingNumber': req.params.trackingNumber 
-    });
-    
-    if (!manifest) {
-      return res.status(404).json({ error: 'Parcel not found' });
+  const confirmMultiParcelScan = () => {
+    if (pendingScanData) {
+      processScan(
+        pendingScanData.scannedNumber,
+        pendingScanData.timestamp,
+        pendingScanData.scanId
+      );
     }
+    setShowMultiParcelWarning(false);
+    setPendingScanData(null);
+  };
 
-    const parcel = manifest.parcels.find(
-      p => p.trackingNumber === req.params.trackingNumber
+  const cancelMultiParcelScan = () => {
+    setShowMultiParcelWarning(false);
+    setPendingScanData(null);
+    // Clear the scan buffer if needed
+    scanBuffer.current = '';
+    setScanInput('');
+    if (isScanning) {
+      inputRef.current?.focus();
+    }
+  };
+
+  const updateRecentScan = (scanId, updates) => {
+    setRecentScans(prev => prev.map(scan => 
+      scan.id === scanId ? { ...scan, ...updates } : scan
+    ));
+  };
+
+  const toggleScanning = () => {
+    setIsScanning(!isScanning);
+    if (!isScanning) {
+      scanBuffer.current = '';
+      inputRef.current?.focus();
+    }
+  };
+
+  const handleScanInputChange = (e) => {
+    setScanInput(e.target.value);
+  };
+
+  const handleScanInputKeyDown = (e) => {
+    if (e.key === 'Enter' && scanInput.trim().length >= 3) {
+      e.preventDefault();
+      handleAutoScan(scanInput.trim());
+      setScanInput('');
+    }
+  };
+
+const getStatusIcon = (status) => {
+  const iconStyle = { width: '16px', height: '16px' };
+  switch (status) {
+    case 'success': return <CheckCircle style={{ ...iconStyle, color: '#10B981' }} />;
+    case 'error': return <AlertCircle style={{ ...iconStyle, color: '#EF4444' }} />;
+    case 'pending': return <Package style={{ ...iconStyle, color: '#F59E0B' }} />;
+    case 'warning': return <AlertTriangle style={{ ...iconStyle, color: '#F59E0B' }} />;
+    default: return <div style={{ ...iconStyle, backgroundColor: '#D1D5DB', borderRadius: '9999px', animation: 'pulse 2s infinite' }} />;
+  }
+};
+
+const getStatusColor = (status, trackingNumber) => {
+  // Check if this is a multi-parcel customer first
+  const isMultiParcel = trackingNumber && isMultiParcelCustomer(trackingNumber);
+  
+  if (isMultiParcel && status === 'success') {
+    return { 
+      backgroundColor: '#F5F3FF', 
+      borderColor: '#DDD6FE', 
+      color: '#5B21B6' 
+    };
+  }
+
+  switch (status) {
+    case 'success': return { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5', color: '#065F46' };
+    case 'error': return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', color: '#991B1B' };
+    case 'pending': return { backgroundColor: '#FFFBEB', borderColor: '#FDE68A', color: '#92400E' };
+    case 'warning': return { backgroundColor: '#FEF3C7', borderColor: '#FCD34D', color: '#92400E' };
+    default: return { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB', color: '#1F2937' };
+  }
+};
+
+  const containerStyle = {
+    minHeight: '100vh',
+    backgroundColor: '#F9FAFB',
+    padding: '16px'
+  };
+
+  const cardStyle = {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    padding: '24px',
+    marginBottom: '24px'
+  };
+
+  const buttonStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    padding: '12px 16px',
+    borderRadius: '8px',
+    fontWeight: '500',
+    transition: 'all 0.2s',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+    cursor: 'pointer',
+    border: 'none'
+  };
+
+  const scanButtonStyle = {
+    ...buttonStyle,
+    backgroundColor: isScanning ? '#DC2626' : '#2563EB',
+    color: 'white'
+  };
+
+    const ManifestDetailsView = () => {
+    if (!manifestDetails) return null;
+
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+          <button 
+            onClick={() => setViewMode('scan')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 12px',
+              backgroundColor: '#E5E7EB',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            <X size={16} />
+            <span>Back</span>
+          </button>
+          <h2 style={{ fontSize: '20px', fontWeight: '600' }}>
+            {manifestDetails.manifestNumber}
+          </h2>
+          <div style={{ 
+            backgroundColor: '#EFF6FF',
+            color: '#1E40AF',
+            padding: '4px 8px',
+            borderRadius: '9999px',
+            fontSize: '14px'
+          }}>
+            {manifestDetails.date ? new Date(manifestDetails.date).toLocaleDateString() : 'No date'}
+          </div>
+        </div>
+
+        <div style={{ 
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr 1fr',
+          gap: '16px',
+          marginBottom: '24px'
+        }}>
+          <div style={cardStyle}>
+            <h3 style={{ fontSize: '14px', color: '#6B7280', marginBottom: '8px' }}>Total Parcels</h3>
+            <p style={{ fontSize: '24px', fontWeight: '600' }}>{manifestDetails.totalParcels}</p>
+          </div>
+          <div style={cardStyle}>
+            <h3 style={{ fontSize: '14px', color: '#6B7280', marginBottom: '8px' }}>Received</h3>
+            <p style={{ fontSize: '24px', fontWeight: '600', color: '#10B981' }}>
+              {manifestDetails.receivedParcels}
+            </p>
+          </div>
+          <div style={cardStyle}>
+            <h3 style={{ fontSize: '14px', color: '#6B7280', marginBottom: '8px' }}>Completion</h3>
+            <p style={{ fontSize: '24px', fontWeight: '600' }}>
+              {Math.round((manifestDetails.receivedParcels / manifestDetails.totalParcels) * 100)}%
+            </p>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '24px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>Scan Activity</h3>
+          <div style={{ 
+            maxHeight: '300px',
+            overflowY: 'auto',
+            border: '1px solid #E5E7EB',
+            borderRadius: '8px'
+          }}>
+            {manifestDetails.scanActivity.map((scan, index) => (
+              <div key={index} style={{ 
+                padding: '12px 16px',
+                borderBottom: '1px solid #E5E7EB',
+                backgroundColor: scan.received ? '#ECFDF5' : 'white'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <div>
+                    <p style={{ fontWeight: '500' }}>{scan.trackingNumber}</p>
+                    <p style={{ fontSize: '12px', color: '#6B7280' }}>
+                      {scan.consigneeName}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: '12px' }}>
+                      {new Date(scan.timestamp).toLocaleTimeString()}
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#6B7280' }}>
+                      {scan.user}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>All Parcels</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#F9FAFB' }}>
+                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Tracking #</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Consignee</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Status</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Scanned By</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {manifestDetails.parcels.map((parcel, index) => (
+                  <tr key={index} style={{ borderBottom: '1px solid #E5E7EB' }}>
+                    <td style={{ padding: '12px' }}>{parcel.trackingNumber}</td>
+                    <td style={{ padding: '12px' }}>{parcel.consigneeName}</td>
+                    <td style={{ padding: '12px' }}>
+                      {parcel.received ? (
+                        <span style={{ 
+                          backgroundColor: '#ECFDF5',
+                          color: '#065F46',
+                          padding: '4px 8px',
+                          borderRadius: '9999px',
+                          fontSize: '12px'
+                        }}>
+                          Received
+                        </span>
+                      ) : (
+                        <span style={{ 
+                          backgroundColor: '#FEF2F2',
+                          color: '#92400E',
+                          padding: '4px 8px',
+                          borderRadius: '9999px',
+                          fontSize: '12px'
+                        }}>
+                          Pending
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px' }}>{parcel.receivedBy || '-'}</td>
+                    <td style={{ padding: '12px' }}>
+                      {parcel.receivedAt ? new Date(parcel.receivedAt).toLocaleTimeString() : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     );
+  };
 
-    if (!parcel) {
-      return res.status(404).json({ error: 'Parcel not found' });
-    }
 
-    res.json({ 
-      success: true, 
-      parcel: {
-        ...parcel.toObject(),
-        manifestNumber: manifest.manifestNumber,
-        manifestDate: manifest.date
+  return (
+    <div style={containerStyle}>
+      {/* Multi-Parcel Warning Popup */}
+      {showMultiParcelWarning && (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000
+      }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '24px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '16px'
+            }}>
+              <h3 style={{
+                fontSize: '20px',
+                fontWeight: '600',
+                color: '#92400E',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <AlertTriangle style={{ color: '#D97706' }} />
+                Multiple Parcels Warning
+              </h3>
+              <button 
+                onClick={cancelMultiParcelScan}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#6B7280'
+                }}
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <p style={{ marginBottom: '16px', lineHeight: '1.5', fontSize: '16px' }}>
+              Customer <strong style={{ color: '#1E40AF' }}>{currentCustomer}</strong> has{' '}
+              <strong style={{ color: '#B45309' }}>{customerParcelCount} parcels</strong> in the system.
+            </p>
+            
+            <p style={{ marginBottom: '24px', lineHeight: '1.5', fontSize: '14px', color: '#4B5563' }}>
+              Please verify you're scanning the correct parcel for this customer.
+            </p>
+            
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={cancelMultiParcelScan}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: '1px solid #D1D5DB',
+                  background: 'white',
+                  color: '#374151',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  fontSize: '14px'
+                }}
+              >
+                Cancel Scan
+              </button>
+              <button
+                onClick={confirmMultiParcelScan}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#2563EB',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  fontSize: '14px'
+                }}
+              >
+                Confirm Scan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    {viewMode === 'manifest' ? (
+      <ManifestDetailsView />
+    ) : (
+      <>
+        {/* Header */}
+        <div style={{ maxWidth: '1280px', margin: '0 auto 24px' }}>
+          <div style={cardStyle}>
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '16px', 
+              marginBottom: '24px'
+            }}>
+              <div>
+                <h1 style={{ 
+                  fontSize: '24px', 
+                  fontWeight: '700', 
+                  color: '#111827',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <Package style={{ color: '#2563EB' }} />
+                  <span>Parcel Scanner</span>
+                </h1>
+                <p style={{ 
+                  fontSize: '14px', 
+                  color: '#6B7280',
+                  marginTop: '4px'
+                }}>
+                  {isScanning ? 'Ready to scan packages' : 'Start scanning to process parcels'}
+                </p>
+              </div>
+              
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '16px'
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px',
+                  padding: '8px 12px',
+                  backgroundColor: '#F3F4F6',
+                  borderRadius: '8px'
+                }}>
+                  {isOnline ? (
+                    <>
+                      <Wifi style={{ width: '20px', height: '20px', color: '#10B981' }} />
+                      <span style={{ fontSize: '14px', color: '#059669' }}>Online</span>
+                    </>
+                  ) : (
+                    <>
+                      <WifiOff style={{ width: '20px', height: '20px', color: '#EF4444' }} />
+                      <span style={{ fontSize: '14px', color: '#DC2626' }}>Offline</span>
+                    </>
+                  )}
+                </div>
+                {pendingScans.length > 0 && (
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px',
+                    padding: '8px 12px',
+                    backgroundColor: '#FFFBEB',
+                    borderRadius: '8px',
+                    border: '1px solid #FDE68A'
+                  }}>
+                    <RefreshCw style={{ 
+                      width: '16px', 
+                      height: '16px', 
+                      color: '#D97706',
+                      animation: 'spin 1s linear infinite'
+                    }} />
+                    <span style={{ fontSize: '14px', color: '#92400E' }}>
+                      {pendingScans.length} pending sync
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+<div style={{ 
+  marginBottom: '16px',
+  backgroundColor: '#F9FAFB',
+  padding: '16px',
+  borderRadius: '8px',
+  border: '1px solid #E5E7EB'
+}}>
+<label style={{ 
+  display: 'block',
+  fontSize: '14px',
+  fontWeight: '500',
+  color: '#374151',
+  marginBottom: '8px'
+}}>
+  Select Manifest
+</label>
+<select
+  value={selectedManifest}
+  onChange={(e) => setSelectedManifest(e.target.value)}
+  style={{
+    width: '100%',
+    padding: '10px 12px',
+    border: '1px solid #D1D5DB',
+    borderRadius: '6px',
+    fontSize: '14px',
+    outline: 'none',
+    backgroundColor: 'white'
+  }}
+  disabled={manifests.length === 0}
+>
+  {manifests.length === 0 ? (
+    <option value="">Loading manifests...</option>
+  ) : (
+    <>
+      <option value="">Select a manifest</option>
+      {manifests.map(manifest => (
+        <option key={manifest.manifestNumber} value={manifest.manifestNumber}>
+          {manifest.manifestNumber} ({manifest.date ? new Date(manifest.date).toLocaleDateString() : 'No date'}) - 
+          {manifest.receivedParcels}/{manifest.totalParcels} parcels
+        </option>
+      ))}
+    </>
+  )}
+</select>
+
+  
+<button
+  onClick={() => loadManifestDetails(selectedManifest)}
+  disabled={!selectedManifest}
+  style={{
+    ...buttonStyle,
+    backgroundColor: !selectedManifest ? '#F3F4F6' : '#2563EB',
+    color: !selectedManifest ? '#9CA3AF' : 'white',
+    marginTop: '8px',
+    width: '100%',
+    cursor: !selectedManifest ? 'not-allowed' : 'pointer'
+  }}
+>
+  <Package size={16} />
+  <span>View Manifest Details</span>
+</button>
+</div>
+
+            {/* User Setup and Controls */}
+            <div style={{ 
+              display: 'grid',
+              gridTemplateColumns: '1fr',
+              gap: '24px'
+            }}>
+              {/* User Profile */}
+              <div style={{ 
+                backgroundColor: '#F9FAFB',
+                padding: '16px',
+                borderRadius: '8px',
+                border: '1px solid #E5E7EB'
+              }}>
+                <label style={{ 
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '8px',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <User style={{ width: '16px', height: '16px' }} />
+                  <span>Operator</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter your name"
+                  value={userName}
+                  onChange={(e) => saveUserName(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    outline: 'none',
+                    fontSize: '14px'
+                  }}
+                />
+                <div style={{ 
+                  marginTop: '8px',
+                  fontSize: '12px',
+                  color: '#6B7280'
+                }}>
+                  {userName ? `Operator ID: ${userId}` : 'Please enter your name'}
+                </div>
+              </div>
+
+              {/* Scanner Controls */}
+              <div style={{ 
+                backgroundColor: '#EFF6FF',
+                padding: '16px',
+                borderRadius: '8px',
+                border: '1px solid #BFDBFE'
+              }}>
+                <div style={{ 
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '8px'
+                }}>
+                  <h3 style={{ 
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#1E40AF'
+                  }}>
+                    Scanner Controls
+                  </h3>
+                  <div style={{ 
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '14px',
+                    color: '#2563EB'
+                  }}>
+                    <Package style={{ width: '16px', height: '16px' }} />
+                    <span>{scanCount} scans</span>
+                  </div>
+                </div>
+                <button
+                  onClick={toggleScanning}
+                  style={scanButtonStyle}
+                >
+                  {isScanning ? (
+                    <>
+                      <Pause style={{ width: '20px', height: '20px' }} />
+                      <span>Stop Scanning</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play style={{ width: '20px', height: '20px' }} />
+                      <span>Start Scanning</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Scanner Status */}
+              <div style={{ 
+                padding: '16px',
+                borderRadius: '8px',
+                border: '1px solid',
+                ...(isScanning 
+                  ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }
+                  : { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB' }
+                )
+              }}>
+                <h3 style={{ 
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  marginBottom: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  ...(isScanning 
+                    ? { color: '#065F46' }
+                    : { color: '#374151' }
+                  )
+                }}>
+                  {isScanning ? (
+                    <>
+                      <div style={{ 
+                        width: '8px',
+                        height: '8px',
+                        backgroundColor: '#10B981',
+                        borderRadius: '9999px',
+                        animation: 'pulse 2s infinite'
+                      }}></div>
+                      <span>Scanner Active</span>
+                    </>
+                  ) : (
+                    <span>Scanner Status</span>
+                  )}
+                </h3>
+                <p style={{ 
+                  fontSize: '12px',
+                  color: isScanning ? '#047857' : '#6B7280'
+                }}>
+                  {isScanning 
+                    ? 'Ready to scan barcodes. Use your barcode scanner or type codes directly.'
+                    : 'Scanner is currently inactive. Click "Start Scanning" to begin.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Scan Input Field */}
+            <div style={{ 
+              marginTop: '24px',
+              padding: '16px',
+              backgroundColor: '#F3F4F6',
+              borderRadius: '8px',
+              border: '1px solid #E5E7EB'
+            }}>
+              <div>
+                <label style={{ 
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '8px'
+                }}>
+                  Scan or Type Tracking Number
+                </label>
+                <input
+                  type="text"
+                  value={scanInput}
+                  onChange={handleScanInputChange}
+                  onKeyDown={handleScanInputKeyDown}
+                  placeholder={isScanning ? "Scan barcode or type and press Enter" : "Start scanning to enable"}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    outline: 'none',
+                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
+                    backgroundColor: isScanning ? 'white' : '#F3F4F6',
+                    cursor: isScanning ? 'text' : 'not-allowed'
+                  }}
+                  disabled={!isScanning}
+                  ref={inputRef}
+                  autoFocus={isScanning}
+                />
+                <p style={{ 
+                  marginTop: '8px',
+                  fontSize: '12px',
+                  color: '#6B7280'
+                }}>
+                  {isScanning 
+                    ? 'Scan barcodes automatically or type and press Enter'
+                    : 'Enable scanning to use this field'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div style={{ 
+          maxWidth: '1280px',
+          margin: '0 auto',
+          display: 'grid',
+          gridTemplateColumns: '1fr',
+          gap: '24px'
+        }}>
+          {/* Recent Scans */}
+          <div style={{ 
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            overflow: 'hidden'
+          }}>
+            <div style={{ 
+              padding: '24px',
+              borderBottom: '1px solid #E5E7EB'
+            }}>
+              <div style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <h2 style={{ 
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  color: '#111827'
+                }}>
+                  Recent Scans
+                </h2>
+                <span style={{ 
+                  fontSize: '12px',
+                  backgroundColor: '#F3F4F6',
+                  color: '#4B5563',
+                  padding: '4px 8px',
+                  borderRadius: '9999px'
+                }}>
+                  {recentScans.length} items
+                </span>
+              </div>
+            </div>
+            <div style={{ 
+              maxHeight: '500px',
+              overflowY: 'auto'
+            }}>
+              {recentScans.length === 0 ? (
+  <div style={{ 
+    padding: '32px 24px', 
+    textAlign: 'center',
+    color: '#6B7280',
+    fontSize: '14px'
+  }}>
+    <Package style={{ 
+      width: '48px', 
+      height: '48px', 
+      color: '#E5E7EB',
+      marginBottom: '12px'
+    }} />
+    <p style={{ fontWeight: '500' }}>No scans yet</p>
+    <p>Start scanning to see activity here</p>
+  </div>
+) : (
+  <table style={{ 
+    width: '100%', 
+    borderCollapse: 'collapse',
+    tableLayout: 'fixed'
+  }}>
+    <thead style={{ 
+      backgroundColor: '#F9FAFB',
+      position: 'sticky',
+      top: 0,
+      zIndex: 10
+    }}>
+      <tr>
+        <th style={{ 
+          padding: '12px 16px',
+          textAlign: 'left',
+          fontSize: '12px',
+          fontWeight: '500',
+          color: '#6B7280',
+          borderBottom: '1px solid #E5E7EB',
+          width: '30%'
+        }}>
+          Tracking Number
+        </th>
+        <th style={{ 
+          padding: '12px 16px',
+          textAlign: 'left',
+          fontSize: '12px',
+          fontWeight: '500',
+          color: '#6B7280',
+          borderBottom: '1px solid #E5E7EB',
+          width: '25%'
+        }}>
+          Customer
+        </th>
+        <th style={{ 
+          padding: '12px 16px',
+          textAlign: 'left',
+          fontSize: '12px',
+          fontWeight: '500',
+          color: '#6B7280',
+          borderBottom: '1px solid #E5E7EB',
+          width: '20%'
+        }}>
+          Time
+        </th>
+        <th style={{ 
+          padding: '12px 16px',
+          textAlign: 'left',
+          fontSize: '12px',
+          fontWeight: '500',
+          color: '#6B7280',
+          borderBottom: '1px solid #E5E7EB',
+          width: '25%'
+        }}>
+          Status
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {recentScans.map((scan) => {
+        const customerName = extractCustomerName(scan.trackingNumber);
+        const isMultiParcel = customerName && isMultiParcelCustomer(scan.trackingNumber);
+        const statusStyle = getStatusColor(scan.status, scan.trackingNumber);
+        
+        return (
+          <tr 
+            key={scan.id} 
+            style={{ 
+              borderBottom: '1px solid #E5E7EB',
+              ':hover': { backgroundColor: '#F9FAFB' }
+            }}
+          >
+            <td style={{ 
+              padding: '16px',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#111827',
+              wordBreak: 'break-word'
+            }}>
+              {scan.trackingNumber}
+            </td>
+            <td style={{ 
+              padding: '16px',
+              fontSize: '14px',
+              color: '#6B7280',
+              wordBreak: 'break-word'
+            }}>
+              {customerName || 'Unknown'}
+              {isMultiParcel && (
+                <span style={{ 
+                  display: 'inline-block',
+                  marginLeft: '8px',
+                  backgroundColor: '#EDE9FE',
+                  color: '#5B21B6',
+                  padding: '2px 6px',
+                  borderRadius: '9999px',
+                  fontSize: '12px',
+                  fontWeight: '500'
+                }}>
+                  Multi
+                </span>
+              )}
+            </td>
+            <td style={{ 
+              padding: '16px',
+              fontSize: '14px',
+              color: '#6B7280'
+            }}>
+              {new Date(scan.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </td>
+            <td style={{ padding: '16px' }}>
+              <div style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                border: `1px solid ${statusStyle.borderColor}`,
+                backgroundColor: statusStyle.backgroundColor,
+                color: statusStyle.color,
+                fontSize: '14px'
+              }}>
+                {getStatusIcon(scan.status)}
+                <span>{scan.message}</span>
+              </div>
+            </td>
+          </tr>
+        );
+      })}
+    </tbody>
+  </table>
+)}
+            </div>
+          </div>
+
+          {/* Customer Stats */}
+          <div style={{ 
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            overflow: 'hidden'
+          }}>
+            <div style={{ 
+              padding: '24px',
+              borderBottom: '1px solid #E5E7EB'
+            }}>
+              <div style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <h2 style={{ 
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  color: '#111827'
+                }}>
+                  Customer Statistics
+                </h2>
+              </div>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+            <table style={{ minWidth: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+              <thead style={{ backgroundColor: '#F9FAFB' }}>
+                <tr>
+                  <th style={{ 
+                    padding: '12px 24px',
+                    textAlign: 'left',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    color: '#6B7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    borderBottom: '1px solid #E5E7EB'
+                  }}>
+                    Customer
+                  </th>
+                  <th style={{ 
+                    padding: '12px 24px',
+                    textAlign: 'left',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    color: '#6B7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    borderBottom: '1px solid #E5E7EB'
+                  }}>
+                    Total
+                  </th>
+                  <th style={{ 
+                    padding: '12px 24px',
+                    textAlign: 'left',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    color: '#6B7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    borderBottom: '1px solid #E5E7EB'
+                  }}>
+                    Received
+                  </th>
+                  <th style={{ 
+                    padding: '12px 24px',
+                    textAlign: 'left',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    color: '#6B7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    borderBottom: '1px solid #E5E7EB'
+                  }}>
+                    Rate
+                  </th>
+                </tr>
+              </thead>
+ <tbody style={{ backgroundColor: 'white' }}>
+  {!selectedManifest ? (
+    <tr>
+      <td colSpan="4" style={{ padding: '32px 24px', textAlign: 'center' }}>
+        <h3 style={{ 
+          marginTop: '8px',
+          fontSize: '14px',
+          fontWeight: '500',
+          color: '#111827'
+        }}>
+          No manifest selected
+        </h3>
+        <p style={{ 
+          marginTop: '4px',
+          fontSize: '14px',
+          color: '#6B7280'
+        }}>
+          Please select a manifest to view customer statistics
+        </p>
+      </td>
+    </tr>
+  ) : isLoadingStats ? (
+    <tr>
+      <td colSpan="4" style={{ padding: '24px', textAlign: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
+          <RefreshCw className="animate-spin" size={16} />
+          <span>Loading customer statistics...</span>
+        </div>
+      </td>
+    </tr>
+  ) : customerStats.length === 0 ? (
+    <tr>
+      <td colSpan="4" style={{ padding: '32px 24px', textAlign: 'center' }}>
+        <h3 style={{ 
+          marginTop: '8px',
+          fontSize: '14px',
+          fontWeight: '500',
+          color: '#111827'
+        }}>
+          No customer data found
+        </h3>
+        <p style={{ 
+          marginTop: '4px',
+          fontSize: '14px',
+          color: '#6B7280'
+        }}>
+          No parcels found in manifest {selectedManifest}
+        </p>
+      </td>
+    </tr>
+  ) : (
+    customerStats.map((stat, index) => (
+                    <tr key={index} style={{ 
+                      borderBottom: '1px solid #E5E7EB',
+                      transition: 'background-color 0.2s',
+                      ':hover': { backgroundColor: '#F9FAFB' }
+                    }}>
+                      <td style={{ 
+                        padding: '16px 24px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        color: '#111827',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {stat._id}
+                      </td>
+                      <td style={{ 
+                        padding: '16px 24px',
+                        fontSize: '14px',
+                        color: '#6B7280',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {stat.parcelCount}
+                      </td>
+                      <td style={{ 
+                        padding: '16px 24px',
+                        fontSize: '14px',
+                        color: '#6B7280',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {stat.receivedCount}
+                      </td>
+                      <td style={{ 
+                        padding: '16px 24px',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        <div style={{ 
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px'
+                        }}>
+                          <div style={{ 
+                            width: '80px',
+                            backgroundColor: '#E5E7EB',
+                            borderRadius: '9999px',
+                            height: '8px'
+                          }}>
+                            <div 
+                              style={{ 
+                                backgroundColor: '#2563EB',
+                                height: '8px',
+                                borderRadius: '9999px',
+                                width: `${(stat.receivedCount / stat.parcelCount) * 100}%`
+                              }}
+                            ></div>
+                          </div>
+                          <span style={{ 
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            color: '#6B7280'
+                          }}>
+                            {Math.round((stat.receivedCount / stat.parcelCount) * 100)}%
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      </>
+    )}
+
+      {/* Global styles for animations */}
+      <style>{`
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
       }
-    });
-  } catch (error) {
-    console.error('Error fetching parcel:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+    `}</style>
+    </div>
+  );
+};
 
-// === DELETE MANIFEST ROUTE ===
-app.delete('/api/manifests/:manifestNumber', async (req, res) => {
-  try {
-    const manifest = await Manifest.findOneAndDelete({ 
-      manifestNumber: req.params.manifestNumber 
-    });
-    
-    if (!manifest) {
-      return res.status(404).json({ error: 'Manifest not found' });
-    }
-
-    res.json({ 
-      success: true, 
-      message: `Manifest ${req.params.manifestNumber} deleted successfully` 
-    });
-  } catch (error) {
-    console.error('Error deleting manifest:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.get('/health', async (req, res) => {
-  try {
-    // Check database connection
-    const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-    
-    // Get active sessions count
-    const activeSessions = await ScanSession.countDocuments({ isActive: true });
-    
-    // Get recent scan activity (last 5 minutes)
-    const recentActivity = await ScanSession.countDocuments({
-      $or: [
-        { startTime: { $gte: new Date(Date.now() - 5 * 60 * 1000) } },
-        { updatedAt: { $gte: new Date(Date.now() - 5 * 60 * 1000) } }
-      ]
-    });
-
-    res.json({ 
-      status: 'OK',
-      timestamp: new Date().toISOString(),
-      database: dbStatus,
-      activeScanners: activeSessions,
-      recentActivity: recentActivity,
-      uptime: process.uptime()
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      status: 'ERROR',
-      timestamp: new Date().toISOString(),
-      error: error.message
-    });
-  }
-});
-
-// === START SERVER ===
-const PORT = process.env.PORT || 3030;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+export default ScanParcels;
