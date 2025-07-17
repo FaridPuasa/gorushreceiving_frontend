@@ -5,6 +5,7 @@ const Upload = () => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [manifestNumber, setManifestNumber] = useState('');
+  const [product, setProduct] = useState('');
 
   const expectedHeaders = [
     'Tracking Number', 'Shipment Date', 'AWB Number', 'Consignee Name', 
@@ -45,7 +46,6 @@ const Upload = () => {
   };
 
   const handleSubmit = async () => {
-    // Filter out completely empty rows (where all fields are empty)
     const dataToSubmit = tableData.filter(row => 
       Object.values(row).some(value => value !== undefined && value !== '')
     );
@@ -64,7 +64,8 @@ const Upload = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           tableData: dataToSubmit,
-          manifestNumber: manifestNumber.trim() || null // Send null if empty
+          manifestNumber: manifestNumber.trim() || null,
+          product: product.trim() || null
         })
       });
 
@@ -88,6 +89,7 @@ const Upload = () => {
   const handleClear = () => {
     setTableData([{}]);
     setManifestNumber('');
+    setProduct('');
     setMessage('');
   };
 
@@ -117,6 +119,19 @@ const Upload = () => {
               onChange={(e) => setManifestNumber(e.target.value)}
               style={styles.manifestNumberInput}
               placeholder="Enter manifest number"
+            />
+          </label>
+        </div>
+
+                <div style={styles.manifestNumberContainer}>
+          <label style={styles.manifestNumberLabel}>
+            Product:
+            <input
+              type="text"
+              value={product}
+              onChange={(e) => setProduct(e.target.value)}
+              style={styles.manifestNumberInput}
+              placeholder="Enter product type"
             />
           </label>
         </div>

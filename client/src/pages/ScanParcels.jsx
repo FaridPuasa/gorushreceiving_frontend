@@ -134,22 +134,6 @@ useEffect(() => {
 
     if (e.key.length === 1) {
       scanBuffer.current += e.key;
-
-      // Disable timeout logic to avoid double submission
-      // Optionally, keep this if you want fallback for scanners that don't send Enter
-      /*
-      if (scanTimeout.current) {
-        clearTimeout(scanTimeout.current);
-      }
-
-      scanTimeout.current = setTimeout(() => {
-        if (scanBuffer.current.length > 0) {
-          handleAutoScan(scanBuffer.current.trim());
-          scanBuffer.current = '';
-        }
-        scanTimeout.current = null;
-      }, 100);
-      */
     }
   };
 
@@ -247,24 +231,38 @@ const fetchCustomerStats = async (manifestNumber = null) => {
   };
 
 const submitScan = async (trackingNumber, timestamp) => {
-  const response = await fetch('https://grscanningsystemserver.onrender.com/api/scan', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
-      trackingNumber,
-      userId,
-      userName,
-      timestamp,
-      manifestNumber: selectedManifest // Add this line
-    })
-  });
+  try {
+    const response = await fetch('https://grscanningsystemserver.onrender.com/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        trackingNumber,
+        userId,
+        userName,
+        timestamp,
+        manifestNumber: selectedManifest
+      })
+    });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Scan failed');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Scan failed');
+    }
+
+    const result = await response.json();
+    
+    // Handle case where parcel wasn't found in manifest
+    if (result.status === 'not_found') {
+      return {
+        ...result,
+        message: result.message || 'Parcel not in manifest - added as extra'
+      };
+    }
+
+    return result;
+  } catch (error) {
+    throw error;
   }
-
-  return response.json();
 };
 
 const extractCustomerName = (trackingNumber) => {
@@ -313,41 +311,51 @@ const handleAutoScan = async (scannedNumber) => {
   processScan(scannedNumber, new Date().toISOString(), Date.now());
 };
 
-  const processScan = async (scannedNumber, timestamp, scanId) => {
-    const newScan = {
-      id: scanId,
-      trackingNumber: scannedNumber,
-      timestamp,
-      status: 'processing',
-      message: 'Processing...',
-      user: userName || userId
-    };
+const processScan = async (scannedNumber, timestamp, scanId) => {
+  const newScan = {
+    id: scanId,
+    trackingNumber: scannedNumber,
+    timestamp,
+    status: 'processing',
+    message: 'Processing...',
+    user: userName || userId
+  };
 
-    setRecentScans(prev => [newScan, ...prev.slice(0, 19)]);
-    setScanCount(prev => prev + 1);
+  setRecentScans(prev => [newScan, ...prev.slice(0, 19)]);
+  setScanCount(prev => prev + 1);
 
-    try {
-      if (isOnline) {
-        const result = await submitScan(scannedNumber, timestamp);
+  try {
+    if (isOnline) {
+      const result = await submitScan(scannedNumber, timestamp);
+      
+      // Special handling for parcels not in manifest
+      if (result.status === 'not_found') {
+        updateRecentScan(scanId, { 
+          status: 'warning',
+          message: result.message || 'Parcel not in manifest'
+        });
+      } else {
         updateRecentScan(scanId, { 
           status: 'success', 
           message: result.message || 'Scan successful' 
         });
-        fetchCustomerStats();
-      } else {
-        setPendingScans(prev => [...prev, { id: scanId, trackingNumber: scannedNumber, timestamp }]);
-        updateRecentScan(scanId, { 
-          status: 'pending', 
-          message: 'Queued for sync' 
-        });
       }
-    } catch (error) {
+      
+      fetchCustomerStats();
+    } else {
+      setPendingScans(prev => [...prev, { id: scanId, trackingNumber: scannedNumber, timestamp }]);
       updateRecentScan(scanId, { 
-        status: 'error', 
-        message: error.message 
+        status: 'pending', 
+        message: 'Queued for sync' 
       });
     }
-  };
+  } catch (error) {
+    updateRecentScan(scanId, { 
+      status: 'error', 
+      message: error.message 
+    });
+  }
+};
 
   const confirmMultiParcelScan = () => {
     if (pendingScanData) {
@@ -398,15 +406,16 @@ const handleAutoScan = async (scannedNumber) => {
     }
   };
 
-  const getStatusIcon = (status) => {
-    const iconStyle = { width: '16px', height: '16px' };
-    switch (status) {
-      case 'success': return <CheckCircle style={{ ...iconStyle, color: '#10B981' }} />;
-      case 'error': return <AlertCircle style={{ ...iconStyle, color: '#EF4444' }} />;
-      case 'pending': return <Package style={{ ...iconStyle, color: '#F59E0B' }} />;
-      default: return <div style={{ ...iconStyle, backgroundColor: '#D1D5DB', borderRadius: '9999px', animation: 'pulse 2s infinite' }} />;
-    }
-  };
+const getStatusIcon = (status) => {
+  const iconStyle = { width: '16px', height: '16px' };
+  switch (status) {
+    case 'success': return <CheckCircle style={{ ...iconStyle, color: '#10B981' }} />;
+    case 'error': return <AlertCircle style={{ ...iconStyle, color: '#EF4444' }} />;
+    case 'pending': return <Package style={{ ...iconStyle, color: '#F59E0B' }} />;
+    case 'warning': return <AlertTriangle style={{ ...iconStyle, color: '#F59E0B' }} />;
+    default: return <div style={{ ...iconStyle, backgroundColor: '#D1D5DB', borderRadius: '9999px', animation: 'pulse 2s infinite' }} />;
+  }
+};
 
 const getStatusColor = (status, trackingNumber) => {
   // Check if this is a multi-parcel customer first
@@ -424,6 +433,7 @@ const getStatusColor = (status, trackingNumber) => {
     case 'success': return { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5', color: '#065F46' };
     case 'error': return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', color: '#991B1B' };
     case 'pending': return { backgroundColor: '#FFFBEB', borderColor: '#FDE68A', color: '#92400E' };
+    case 'warning': return { backgroundColor: '#FEF3C7', borderColor: '#FCD34D', color: '#92400E' };
     default: return { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB', color: '#1F2937' };
   }
 };
