@@ -112,6 +112,32 @@ useEffect(() => {
   loadManifests();
 }, []);
 
+const loadManifestDetails = async (manifestNumber) => {
+  if (!manifestNumber) return;
+  
+  try {
+    const res = await fetch(`https://grscanningsystemserver.onrender.com/api/manifests/${encodeURIComponent(manifestNumber)}`);
+    const data = await res.json();
+    
+    if (data.success) {
+      // Also fetch the scan activity for this manifest
+      const activityRes = await fetch(`https://grscanningsystemserver.onrender.com/api/manifests/${encodeURIComponent(manifestNumber)}/scans`);
+      const activityData = await activityRes.json();
+      
+      setManifestDetails({
+        ...data.manifest,
+        scanActivity: activityData.success ? activityData.scanActivity : []
+      });
+      setViewMode('manifest');
+    } else {
+      throw new Error(data.error || 'Failed to load manifest details');
+    }
+  } catch (error) {
+    console.error('Error loading manifest details:', error);
+    // You might want to show an error message to the user here
+  }
+};
+
 useEffect(() => {
   const handleKeyPress = (e) => {
     if (!isScanning) return;
