@@ -13,6 +13,7 @@ const ScanParcels = () => {
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [scanInput, setScanInput] = useState('');
   const [showMultiParcelWarning, setShowMultiParcelWarning] = useState(false);
+  const [customManifestName, setCustomManifestName] = useState('UNMANIFESTED');
   const [currentCustomer, setCurrentCustomer] = useState(null);
   const [customerParcelCount, setCustomerParcelCount] = useState(0);
   const [pendingScanData, setPendingScanData] = useState(null);
@@ -211,25 +212,51 @@ const fetchCustomerStats = async (manifestNumber = null) => {
   setIsLoadingStats(true);
   
   try {
-    // Don't fetch if no manifest is selected
-    if (!manifestNumber && !selectedManifest) {
-      setCustomerStats([]);
-      return;
-    }
-
-    const manifestToFetch = manifestNumber || selectedManifest;
-    const res = await fetch(`https://grscanningsystemserver.onrender.com/api/stats/customers?manifest=${encodeURIComponent(manifestToFetch)}`);
-    
-    if (!res.ok) {
-      throw new Error(`HTTP error! status: ${res.status}`);
-    }
-
-    const data = await res.json();
-    
-    if (data.success && Array.isArray(data.stats)) {
-      setCustomerStats(data.stats);
+    if (manifestNumber === 'UNMANIFESTED') {
+      // Special handling for unmanifested parcels
+      const res = await fetch(`https://grscanningsystemserver.onrender.com/api/manifests/UNMANIFESTED`);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        // Format the data similarly to customer stats
+        const stats = [{
+          _id: 'Unmanifested',
+          parcelCount: data.manifest.parcels.length,
+          receivedCount: data.manifest.parcels.filter(p => p.received).length,
+          trackingNumbers: data.manifest.parcels.map(p => p.trackingNumber)
+        }];
+        
+        setCustomerStats(stats);
+      } else {
+        setCustomerStats([]);
+      }
     } else {
-      setCustomerStats([]);
+      // Existing manifest handling
+      // Don't fetch if no manifest is selected
+      if (!manifestNumber && !selectedManifest) {
+        setCustomerStats([]);
+        return;
+      }
+
+      const manifestToFetch = manifestNumber || selectedManifest;
+      const res = await fetch(`https://grscanningsystemserver.onrender.com/api/stats/customers?manifest=${encodeURIComponent(manifestToFetch)}`);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
+      const data = await res.json();
+      
+      if (data.success && Array.isArray(data.stats)) {
+        setCustomerStats(data.stats);
+      } else {
+        setCustomerStats([]);
+      }
     }
   } catch (error) {
     console.error('Failed to fetch customer stats:', error);
@@ -266,7 +293,8 @@ const submitScan = async (trackingNumber, timestamp) => {
         userId,
         userName,
         timestamp,
-        manifestNumber: selectedManifest
+        manifestNumber: selectedManifest,
+        customManifestName: selectedManifest === 'UNMANIFESTED' ? customManifestName : null
       })
     });
 
@@ -354,16 +382,18 @@ const processScan = async (scannedNumber, timestamp, scanId) => {
     if (isOnline) {
       const result = await submitScan(scannedNumber, timestamp);
       
-      // Special handling for parcels not in manifest
+      // Handle different response cases
       if (result.status === 'not_found') {
         updateRecentScan(scanId, { 
           status: 'warning',
-          message: result.message || 'Parcel not in manifest'
+          message: result.message || 'Parcel not in manifest - added as unmanifested'
         });
       } else {
         updateRecentScan(scanId, { 
           status: 'success', 
-          message: result.message || 'Scan successful' 
+          message: result.message || (result.manifestNumber === 'UNMANIFESTED' 
+            ? 'Scan successful (unmanifested)' 
+            : 'Scan successful') 
         });
       }
       
@@ -835,6 +865,34 @@ const getStatusColor = (status, trackingNumber) => {
               </div>
             </div>
 
+            {selectedManifest === 'UNMANIFESTED' && (
+  <div style={{ marginTop: '8px' }}>
+    <label style={{ 
+      display: 'block',
+      fontSize: '14px',
+      fontWeight: '500',
+      color: '#374151',
+      marginBottom: '8px'
+    }}>
+      Custom Manifest Name
+    </label>
+    <input
+      type="text"
+      value={customManifestName}
+      onChange={(e) => setCustomManifestName(e.target.value)}
+      placeholder="Enter custom manifest name"
+      style={{
+        width: '100%',
+        padding: '8px 12px',
+        border: '1px solid #D1D5DB',
+        borderRadius: '6px',
+        outline: 'none',
+        fontSize: '14px'
+      }}
+    />
+  </div>
+)}
+
 <div style={{ 
   marginBottom: '16px',
   backgroundColor: '#F9FAFB',
@@ -870,6 +928,7 @@ const getStatusColor = (status, trackingNumber) => {
   ) : (
     <>
       <option value="">Select a manifest</option>
+      <option value="UNMANIFESTED">Unmanifested Parcels</option>
       {manifests.map(manifest => (
         <option key={manifest.manifestNumber} value={manifest.manifestNumber}>
           {manifest.manifestNumber} ({manifest.date ? new Date(manifest.date).toLocaleDateString() : 'No date'}) - 

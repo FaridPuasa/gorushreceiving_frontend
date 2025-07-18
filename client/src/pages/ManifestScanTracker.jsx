@@ -310,20 +310,21 @@ const ManifestScanTracker = () => {
     });
   };
 
-  // Export manifest as CSV
-  const exportToCSV = (manifest) => {
-    const stats = getManifestStats(manifest);
-    
-    // Create CSV header
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += `Manifest Number,${manifest.manifestNumber}\n`;
-    csvContent += `Created At,${formatDate(manifest.createdAt)}\n`;
-    csvContent += `Status,${stats.percentage}% Complete\n`;
-    csvContent += `Total Parcels,${stats.total}\n`;
-    csvContent += `Scanned Parcels,${stats.scanned}\n`;
-    csvContent += `Pending Parcels,${stats.pending}\n\n`;
-    
-    // Add scanned parcels section
+const exportToCSV = (manifest) => {
+  const stats = getManifestStats(manifest);
+  
+  // Create CSV header
+  let csvContent = "data:text/csv;charset=utf-8,";
+  csvContent += `Manifest Number,${manifest.manifestNumber}\n`;
+  csvContent += `Product,${manifest.product || 'N/A'}\n`;
+  csvContent += `Created At,${formatDate(manifest.createdAt)}\n`;
+  csvContent += `Status,${stats.percentage}% Complete\n`;
+  csvContent += `Total Parcels,${stats.total}\n`;
+  csvContent += `Scanned Parcels,${stats.scanned}\n`;
+  csvContent += `Pending Parcels,${stats.pending}\n\n`;
+  
+  // Add scanned parcels section
+  if (stats.scanned > 0) {
     csvContent += `Scanned Parcels (${stats.scanned})\n`;
     csvContent += "Tracking Number,Consignee Name,Received At,Received By\n";
     manifest.parcels
@@ -331,25 +332,30 @@ const ManifestScanTracker = () => {
       .forEach(p => {
         csvContent += `${p.trackingNumber},"${p.consigneeName}",${p.receivedAt ? formatDate(p.receivedAt) : ''},"${p.receivedBy || ''}"\n`;
       });
-    
-    // Add pending parcels section
-    csvContent += `\nPending Parcels (${stats.pending})\n`;
+    csvContent += '\n';
+  }
+  
+  // Add pending parcels section
+  if (stats.pending > 0) {
+    csvContent += `Pending Parcels (${stats.pending})\n`;
     csvContent += "Tracking Number,Consignee Name,Shipment Date\n";
     manifest.parcels
       .filter(p => !p.received)
       .forEach(p => {
         csvContent += `${p.trackingNumber},"${p.consigneeName}",${p.shipmentDate ? formatDate(p.shipmentDate) : ''}\n`;
       });
-    
-    // Create download link
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `${manifest.manifestNumber}_scan_report.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  }
+  
+  // Create download link
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `${manifest.manifestNumber}_scan_report.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 
   // Filter and sort manifests
   const filteredManifests = manifests
