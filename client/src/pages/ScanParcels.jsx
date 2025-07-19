@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Pause, Play, Package, CheckCircle, AlertCircle, Wifi, WifiOff, User, RefreshCw, AlertTriangle, X } from 'lucide-react';
+import { Pause, Play, Package, CheckCircle, AlertCircle, Wifi, WifiOff, User, RefreshCw, AlertTriangle, X, Unlock, Lock } from 'lucide-react';
 
 const ScanParcels = () => {
   const [isScanning, setIsScanning] = useState(false);
@@ -14,6 +14,8 @@ const ScanParcels = () => {
   const [scanInput, setScanInput] = useState('');
   const [showMultiParcelWarning, setShowMultiParcelWarning] = useState(false);
   const [customManifestName, setCustomManifestName] = useState('UNMANIFESTED');
+  const [selectedProduct, setSelectedProduct] = useState('');
+  const [productLocked, setProductLocked] = useState(false);
   const [currentCustomer, setCurrentCustomer] = useState(null);
   const [customerParcelCount, setCustomerParcelCount] = useState(0);
   const [pendingScanData, setPendingScanData] = useState(null);
@@ -305,16 +307,67 @@ const submitScan = async (trackingNumber, timestamp) => {
 
     const result = await response.json();
     
-    // Handle case where parcel wasn't found in manifest
-    if (result.status === 'not_found') {
+    // Return the full parcel data if available
+    if (result.parcel) {
       return {
         ...result,
-        message: result.message || 'Parcel not in manifest - added as extra'
+        parcel: {
+          ...result.parcel,
+          // Ensure we have all required fields for GR_DMS
+          consigneeName: result.parcel.consigneeName || 'Unknown',
+          consigneePhone: result.parcel.consigneePhone || '',
+          consigneeEmail: result.parcel.consigneeEmail || '',
+          consigneeAddress: result.parcel.consigneeAddress || '',
+          zipCode: result.parcel.zipCode || '',
+          description: result.parcel.description || '',
+          weight: result.parcel.actualWeight || 0,
+          declaredValue: result.parcel.declaredValue || 0,
+          status: 'pending',
+          manifestNumber: result.parcel.manifestNumber || selectedManifest,
+          shipmentDate: result.parcel.shipmentDate || new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
       };
     }
 
     return result;
   } catch (error) {
+    throw error;
+  }
+};
+
+const updateGRDMSOrder = async (parcelData) => {
+  try {
+    // Add the constant fields to the parcel data
+    const orderData = {
+      ...parcelData,
+      paymentMethod: "NON COD",
+      totalPrice: 0,
+      jobType: "Delivery",
+      currentStatus: "At Warehouse",
+      warehouseEntry: "Yes",
+      attempt: "1",
+      latestLocation: "Warehouse K2",
+      lastUpdatedBy: userId,
+      jobMethod: "Standard",
+      product: selectedProduct
+    };
+
+    const response = await fetch('https://grscanningsystemserver.onrender.com/api/orders/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderData)
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update GR_DMS order');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating GR_DMS order:', error);
     throw error;
   }
 };
@@ -395,6 +448,16 @@ const processScan = async (scannedNumber, timestamp, scanId) => {
             ? 'Scan successful (unmanifested)' 
             : 'Scan successful') 
         });
+        
+        // Update GR_DMS orders if scan was successful
+        if (result.parcel) {
+          try {
+            const orderUpdate = await updateGRDMSOrder(result.parcel);
+            console.log('GR_DMS order update result:', orderUpdate);
+          } catch (orderError) {
+            console.error('Failed to update GR_DMS order:', orderError);
+          }
+        }
       }
       
       fetchCustomerStats();
@@ -412,7 +475,6 @@ const processScan = async (scannedNumber, timestamp, scanId) => {
     });
   }
 };
-
   const confirmMultiParcelScan = () => {
     if (pendingScanData) {
       processScan(
@@ -996,6 +1058,7 @@ const getStatusColor = (status, trackingNumber) => {
                     fontSize: '14px'
                   }}
                 />
+                
                 <div style={{ 
                   marginTop: '8px',
                   fontSize: '12px',
@@ -1004,6 +1067,218 @@ const getStatusColor = (status, trackingNumber) => {
                   {userName ? `Operator ID: ${userId}` : 'Please enter your name'}
                 </div>
               </div>
+
+<div style={{
+  maxWidth: '400px',
+  margin: '0 auto',
+  padding: '24px',
+  backgroundColor: 'white'
+}}>
+  {/* Warning Banner - Only shows when unlocked */}
+  {!productLocked && (
+    <div style={{
+      marginBottom: '24px',
+      padding: '16px',
+      backgroundColor: '#fef3c7',
+      border: '2px solid #f59e0b',
+      borderRadius: '12px',
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: '12px',
+      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+    }}>
+      <AlertTriangle 
+        style={{ 
+          color: '#d97706', 
+          marginTop: '2px',
+          flexShrink: 0 
+        }} 
+        size={24} 
+      />
+      <div>
+        <h3 style={{
+          fontWeight: '700',
+          color: '#92400e',
+          fontSize: '16px',
+          marginBottom: '6px',
+          margin: 0
+        }}>
+          Critical Selection Required
+        </h3>
+        <p style={{
+          color: '#a16207',
+          fontSize: '14px',
+          lineHeight: '1.5',
+          margin: 0
+        }}>
+          Please select your product carefully. This cannot be changed after confirmation.
+        </p>
+      </div>
+    </div>
+  )}
+
+  <div>
+    <label style={{
+      display: 'block',
+      fontSize: '18px',
+      fontWeight: '700',
+      color: '#111827',
+      marginBottom: '16px'
+    }}>
+      Select Your Product *
+    </label>
+    
+    {/* Lock toggle button */}
+    {selectedProduct && (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'flex-end',
+        marginBottom: '8px'
+      }}>
+        <button
+          onClick={() => setProductLocked(!productLocked)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 12px',
+            backgroundColor: productLocked ? '#dcfce7' : '#fef3c7',
+            border: `2px solid ${productLocked ? '#16a34a' : '#f59e0b'}`,
+            borderRadius: '20px',
+            cursor: 'pointer',
+            fontWeight: '600',
+            fontSize: '14px',
+            color: productLocked ? '#166534' : '#92400e'
+          }}
+        >
+          {productLocked ? (
+            <>
+              <Lock size={16} />
+              <span>Locked</span>
+            </>
+          ) : (
+            <>
+              <Unlock size={16} />
+              <span>Unlocked</span>
+            </>
+          )}
+        </button>
+      </div>
+    )}
+
+    <select
+      value={selectedProduct}
+      onChange={(e) => setSelectedProduct(e.target.value)}
+      disabled={productLocked}
+      style={{
+        width: '100%',
+        padding: '16px',
+        fontSize: '16px',
+        fontWeight: '600',
+        border: `3px solid ${productLocked ? '#d1d5db' : '#3b82f6'}`,
+        borderRadius: '12px',
+        backgroundColor: productLocked ? '#f3f4f6' : 'white',
+        outline: 'none',
+        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+        transition: 'all 0.2s ease',
+        cursor: productLocked ? 'not-allowed' : 'pointer',
+        opacity: productLocked ? 0.8 : 1
+      }}
+      onFocus={(e) => {
+        if (!productLocked) {
+          e.target.style.borderColor = '#1d4ed8';
+          e.target.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.2)';
+        }
+      }}
+      onBlur={(e) => {
+        if (!productLocked) {
+          e.target.style.borderColor = '#3b82f6';
+          e.target.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+        }
+      }}
+      onMouseEnter={(e) => {
+        if (!productLocked && e.target !== document.activeElement) {
+          e.target.style.borderColor = '#2563eb';
+          e.target.style.boxShadow = '0 6px 12px rgba(0, 0, 0, 0.15)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!productLocked && e.target !== document.activeElement) {
+          e.target.style.borderColor = '#3b82f6';
+          e.target.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+        }
+      }}
+    >
+      <option value="" style={{ color: '#6b7280', fontWeight: 'normal' }}>
+        -- Please select a product --
+      </option>
+      <option value="mglobal" style={{ fontWeight: '600', padding: '8px' }}>MGlobal</option>
+      <option value="pdu" style={{ fontWeight: '600', padding: '8px' }}>PDU</option>
+      <option value="ewe" style={{ fontWeight: '600', padding: '8px' }}>EWE</option>
+      <option value="MOH" style={{ fontWeight: '600', padding: '8px' }}>MOH</option>
+      <option value="JPMC" style={{ fontWeight: '600', padding: '8px' }}>JPMC</option>
+    </select>
+
+    {selectedProduct && (
+      <div style={{
+        marginTop: '16px',
+        padding: '14px',
+        backgroundColor: productLocked ? '#dcfce7' : '#e0f2fe',
+        border: `2px solid ${productLocked ? '#16a34a' : '#0ea5e9'}`,
+        borderRadius: '10px',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <p style={{
+          color: productLocked ? '#15803d' : '#0369a1',
+          fontSize: '15px',
+          fontWeight: '600',
+          margin: 0
+        }}>
+          {productLocked ? '✓ Locked: ' : '✓ Selected: '}
+          <span style={{ fontWeight: '700', textTransform: 'uppercase' }}>
+            {selectedProduct}
+          </span>
+        </p>
+        
+        {productLocked && (
+          <span style={{
+            backgroundColor: '#16a34a',
+            color: 'white',
+            padding: '4px 8px',
+            borderRadius: '9999px',
+            fontSize: '12px',
+            fontWeight: '700'
+          }}>
+            LOCKED
+          </span>
+        )}
+      </div>
+    )}
+
+    {!selectedProduct && (
+      <div style={{
+        marginTop: '16px',
+        padding: '14px',
+        backgroundColor: '#fef2f2',
+        border: '2px solid #dc2626',
+        borderRadius: '10px',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+      }}>
+        <p style={{
+          color: '#dc2626',
+          fontSize: '15px',
+          fontWeight: '600',
+          margin: 0
+        }}>
+          ⚠ Product selection is required to continue
+        </p>
+      </div>
+    )}
+  </div>
+</div>
 
               {/* Scanner Controls */}
               <div style={{ 
