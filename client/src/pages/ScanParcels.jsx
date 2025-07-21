@@ -296,7 +296,8 @@ const submitScan = async (trackingNumber, timestamp) => {
         userName,
         timestamp,
         manifestNumber: selectedManifest,
-        customManifestName: selectedManifest === 'UNMANIFESTED' ? customManifestName : null
+        customManifestName: selectedManifest === 'UNMANIFESTED' ? customManifestName : null,
+        product: selectedProduct
       })
     });
 
