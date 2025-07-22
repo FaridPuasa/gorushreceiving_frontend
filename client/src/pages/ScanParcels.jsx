@@ -287,6 +287,20 @@ const fetchCustomerStats = async (manifestNumber = null) => {
 
 const submitScan = async (trackingNumber, timestamp) => {
   try {
+        console.log('🔍 FRONTEND: submitScan called with selectedProduct:', selectedProduct);
+
+    const requestBody = { 
+      trackingNumber,
+      userId,
+      userName,
+      timestamp,
+      manifestNumber: selectedManifest,
+      customManifestName: selectedManifest === 'UNMANIFESTED' ? customManifestName : null,
+      product: selectedProduct
+    };
+
+    console.log('🔍 FRONTEND: Request body being sent:', requestBody);
+
     const response = await fetch('https://grscanningsystemserver.onrender.com/api/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -307,7 +321,7 @@ const submitScan = async (trackingNumber, timestamp) => {
     }
 
     const result = await response.json();
-    
+
     // Return the full parcel data if available
     if (result.parcel) {
       return {
@@ -340,7 +354,9 @@ const submitScan = async (trackingNumber, timestamp) => {
 
 const updateGRDMSOrder = async (parcelData) => {
   try {
-    // Add the constant fields to the parcel data
+    console.log('🔍 FRONTEND: updateGRDMSOrder received parcelData:', parcelData);
+    console.log('🔍 FRONTEND: selectedProduct value:', selectedProduct);
+
     const orderData = {
       ...parcelData,
       paymentMethod: "NON COD",
@@ -354,6 +370,8 @@ const updateGRDMSOrder = async (parcelData) => {
       jobMethod: "Standard",
       product: selectedProduct
     };
+
+    console.log('🔍 FRONTEND: orderData being sent to backend:', orderData);
 
     const response = await fetch('https://grscanningsystemserver.onrender.com/api/orders/update', {
       method: 'POST',
