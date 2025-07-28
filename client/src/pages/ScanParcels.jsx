@@ -16,6 +16,7 @@ const ScanParcels = () => {
   const [customManifestName, setCustomManifestName] = useState('UNMANIFESTED');
   const [selectedProduct, setSelectedProduct] = useState('');
   const [productLocked, setProductLocked] = useState(false);
+    const [user, setUser] = useState(null);
   const [currentCustomer, setCurrentCustomer] = useState(null);
   const [customerParcelCount, setCustomerParcelCount] = useState(0);
   const [pendingScanData, setPendingScanData] = useState(null);
@@ -40,7 +41,12 @@ useEffect(() => {
     return;
   }
 
-  
+    useEffect(() => {
+    const userData = JSON.parse(localStorage.getItem('user'));
+    if (userData) {
+      setUser(userData);
+    }
+  }, []);
 
   const fetchCustomerStats = async () => {
     setIsLoadingStats(true);

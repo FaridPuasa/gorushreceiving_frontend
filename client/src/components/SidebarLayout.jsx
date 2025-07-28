@@ -1,9 +1,11 @@
 import React from 'react';
 import GoRushLogo from '../assets/GoRush_Logo.png';
 import { Link, Outlet, useLocation } from 'react-router-dom';
+import { useAuth } from '../pages/AuthContext';
 
 const SidebarLayout = () => {
   const location = useLocation();
+    const { user, logout } = useAuth();
 
   const navItems = [
     { label: '📋 Upload Manifest', path: '/upload' },
@@ -72,6 +74,12 @@ const SidebarLayout = () => {
               <span style={styles.navText}>{item.label.substring(2)}</span>
             </Link>
           ))}
+                  <button 
+            onClick={logout}
+            className="mt-4 w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded"
+          >
+            Logout
+          </button>
         </nav>
       </aside>
 
