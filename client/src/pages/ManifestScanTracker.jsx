@@ -258,7 +258,7 @@ const ManifestScanTracker = () => {
   const fetchManifests = async () => {
     try {
       setLoading(true);
-      const response = await fetch('https://grscanningsystemserver.onrender.com/api/manifests');
+      const response = await fetch('https://warehouse.gorushbn.com/api/manifests');
       if (!response.ok) throw new Error('Failed to fetch manifests');
       
       const data = await response.json();
