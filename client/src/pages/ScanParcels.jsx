@@ -45,7 +45,7 @@ useEffect(() => {
   const fetchCustomerStats = async () => {
     setIsLoadingStats(true);
     try {
-      const res = await fetch(`https://warehouse.gorushbn.com/api/stats/customers?manifest=${encodeURIComponent(selectedManifest)}`);
+      const res = await fetch(`https://grscanningsystemserver.onrender.com/api/stats/customers?manifest=${encodeURIComponent(selectedManifest)}`);
       const data = await res.json();
       if (data.success) {
         setCustomerStats(data.stats);
@@ -92,7 +92,7 @@ const sortedManifests = [...manifests].sort((a, b) => new Date(b.date) - new Dat
 useEffect(() => {
   const loadManifests = async () => {
     try {
-      const res = await fetch('https://warehouse.gorushbn.com/api/manifests/scan-stats');
+      const res = await fetch('https://grscanningsystemserver.onrender.com/api/manifests/scan-stats');
       const data = await res.json();
       if (data.success) {
         // Sort manifests by date (newest first)
@@ -119,12 +119,12 @@ const loadManifestDetails = async (manifestNumber) => {
   if (!manifestNumber) return;
   
   try {
-    const res = await fetch(`https://warehouse.gorushbn.com/api/manifests/${encodeURIComponent(manifestNumber)}`);
+    const res = await fetch(`https://grscanningsystemserver.onrender.com/api/manifests/${encodeURIComponent(manifestNumber)}`);
     const data = await res.json();
     
     if (data.success) {
       // Also fetch the scan activity for this manifest
-      const activityRes = await fetch(`https://warehouse.gorushbn.com/api/manifests/${encodeURIComponent(manifestNumber)}/scans`);
+      const activityRes = await fetch(`https://grscanningsystemserver.onrender.com/api/manifests/${encodeURIComponent(manifestNumber)}/scans`);
       const activityData = await activityRes.json();
       
       setManifestDetails({
@@ -216,7 +216,7 @@ const fetchCustomerStats = async (manifestNumber = null) => {
   try {
     if (manifestNumber === 'UNMANIFESTED') {
       // Special handling for unmanifested parcels
-      const res = await fetch(`https://warehouse.gorushbn.com/api/manifests/UNMANIFESTED`);
+      const res = await fetch(`https://grscanningsystemserver.onrender.com/api/manifests/UNMANIFESTED`);
       
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
@@ -246,7 +246,7 @@ const fetchCustomerStats = async (manifestNumber = null) => {
       }
 
       const manifestToFetch = manifestNumber || selectedManifest;
-      const res = await fetch(`https://warehouse.gorushbn.com/api/stats/customers?manifest=${encodeURIComponent(manifestToFetch)}`);
+      const res = await fetch(`https://grscanningsystemserver.onrender.com/api/stats/customers?manifest=${encodeURIComponent(manifestToFetch)}`);
       
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
@@ -301,7 +301,7 @@ const submitScan = async (trackingNumber, timestamp) => {
 
     console.log('🔍 FRONTEND: Request body being sent:', requestBody);
 
-    const response = await fetch('https://warehouse.gorushbn.com/api/scan', {
+    const response = await fetch('https://grscanningsystemserver.onrender.com/api/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
@@ -373,7 +373,7 @@ const updateGRDMSOrder = async (parcelData) => {
 
     console.log('🔍 FRONTEND: orderData being sent to backend:', orderData);
 
-    const response = await fetch('https://warehouse.gorushbn.com/api/orders/update', {
+    const response = await fetch('https://grscanningsystemserver.onrender.com/api/orders/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(orderData)
