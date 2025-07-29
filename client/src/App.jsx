@@ -1,6 +1,6 @@
 // src/App.js
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './pages/AuthContext';
 import SidebarLayout from './components/SidebarLayout';
 import ScanParcels from './pages/ScanParcels';
@@ -14,16 +14,25 @@ const App = () => {
     <Router>
       <AuthProvider>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/" element={
+          {/* Login route (unprotected) */}
+          <Route path="/loginwarehouse" element={<LoginPage />} />
+
+          {/* Main app routes (protected) */}
+          <Route element={
             <ProtectedRoute>
               <SidebarLayout />
             </ProtectedRoute>
           }>
-            <Route path="upload" element={<Upload />} />
-            <Route path="scan" element={<ScanParcels />} />
-            <Route path="manifestscan" element={<ManifestScanTracker />} />
+            <Route path="/upload" element={<Upload />} />
+            <Route path="/scan" element={<ScanParcels />} />
+            <Route path="/manifestscan" element={<ManifestScanTracker />} />
           </Route>
+
+          {/* Redirect root to /upload */}
+          <Route path="/" element={<Navigate to="/upload" replace />} />
+          
+          {/* Catch-all route redirects to /upload */}
+          <Route path="*" element={<Navigate to="/upload" replace />} />
         </Routes>
       </AuthProvider>
     </Router>
