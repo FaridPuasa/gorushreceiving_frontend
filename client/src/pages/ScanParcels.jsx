@@ -3,6 +3,7 @@ import { Pause, Play, Package, CheckCircle, AlertCircle, Wifi, WifiOff, User, Re
 
 const ScanParcels = () => {
   const [isScanning, setIsScanning] = useState(false);
+  const [isProcessingOnHold, setIsProcessingOnHold] = useState(false);
 const [onHoldInput, setOnHoldInput] = useState('');
 const onHoldInputRef = useRef(null);
   const [recentScans, setRecentScans] = useState([]);
@@ -66,6 +67,7 @@ const handleOnHoldInputKeyDown = async (e) => {
   if (e.key === 'Enter' && onHoldInput.trim().length >= 3) {
     e.preventDefault();
     const trackingNumber = onHoldInput.trim();
+    setIsProcessingOnHold(true);
     
     try {
       // Update Detrack status to On Hold
@@ -120,6 +122,8 @@ const handleOnHoldInputKeyDown = async (e) => {
       };
 
       setRecentScans(prev => [errorScan, ...prev.slice(0, 19)]);
+    } finally {
+      setIsProcessingOnHold(false);
     }
   }
 };
@@ -420,6 +424,7 @@ const updateGRDMSOrder = async (parcelData) => {
   try {
     console.log('🔍 FRONTEND: updateGRDMSOrder received parcelData:', parcelData);
     console.log('🔍 FRONTEND: selectedProduct value:', selectedProduct);
+    
 
     const orderData = {
       ...parcelData,
@@ -1515,6 +1520,13 @@ const getStatusColor = (status, trackingNumber) => {
   borderRadius: '8px',
   border: '1px solid #E5E7EB'
 }}>
+<div style={{ 
+  marginTop: '16px',
+  padding: '16px',
+  backgroundColor: '#F3F4F6',
+  borderRadius: '8px',
+  border: '1px solid #E5E7EB'
+}}>
   <div>
     <label style={{ 
       display: 'block',
@@ -1525,24 +1537,42 @@ const getStatusColor = (status, trackingNumber) => {
     }}>
       Use if Parcel is Held by Customs
     </label>
-    <input
-      type="text"
-      value={onHoldInput}
-      onChange={(e) => setOnHoldInput(e.target.value)}
-      onKeyDown={handleOnHoldInputKeyDown}
-      placeholder="Enter tracking number and press Enter"
-      style={{
-        width: '100%',
-        padding: '12px 16px',
-        border: '1px solid #D1D5DB',
-        borderRadius: '6px',
-        fontSize: '16px',
-        outline: 'none',
-        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
-        backgroundColor: 'white'
-      }}
-      ref={onHoldInputRef}
-    />
+    <div style={{ position: 'relative' }}>
+      <input
+        type="text"
+        value={onHoldInput}
+        onChange={(e) => setOnHoldInput(e.target.value)}
+        onKeyDown={handleOnHoldInputKeyDown}
+        placeholder="Enter tracking number and press Enter"
+        style={{
+          width: '100%',
+          padding: '12px 16px',
+          border: '1px solid #D1D5DB',
+          borderRadius: '6px',
+          fontSize: '16px',
+          outline: 'none',
+          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
+          backgroundColor: 'white',
+          paddingRight: '40px' // Add space for loading indicator
+        }}
+        ref={onHoldInputRef}
+        disabled={isProcessingOnHold} // Disable while processing
+      />
+      {isProcessingOnHold && (
+        <div style={{
+          position: 'absolute',
+          right: '12px',
+          top: '50%',
+          transform: 'translateY(-50%)'
+        }}>
+          <RefreshCw 
+            size={20} 
+            className="animate-spin" 
+            style={{ color: '#3B82F6' }} 
+          />
+        </div>
+      )}
+    </div>
     <p style={{ 
       marginTop: '8px',
       fontSize: '12px',
@@ -1551,6 +1581,7 @@ const getStatusColor = (status, trackingNumber) => {
       If item is approved and received, scan in the item as normal
     </p>
   </div>
+</div>
 </div>
 
           </div>
