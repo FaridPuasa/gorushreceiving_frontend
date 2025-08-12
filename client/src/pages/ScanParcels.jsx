@@ -3,6 +3,8 @@ import { Pause, Play, Package, CheckCircle, AlertCircle, Wifi, WifiOff, User, Re
 
 const ScanParcels = () => {
   const [isScanning, setIsScanning] = useState(false);
+const [onHoldInput, setOnHoldInput] = useState('');
+const onHoldInputRef = useRef(null);
   const [recentScans, setRecentScans] = useState([]);
   const [customerStats, setCustomerStats] = useState([]);
   const [userId] = useState(`scanner_${Math.random().toString(36).substr(2, 9)}`);
@@ -60,7 +62,67 @@ useEffect(() => {
   fetchCustomerStats();
 }, [selectedManifest]);
 
+const handleOnHoldInputKeyDown = async (e) => {
+  if (e.key === 'Enter' && onHoldInput.trim().length >= 3) {
+    e.preventDefault();
+    const trackingNumber = onHoldInput.trim();
+    
+    try {
+      // Update Detrack status to On Hold
+      const response = await fetch('https://grscanningsystemserver.onrender.com/api/detrack/on-hold', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          trackingNumber,
+          userId,
+          userName
+        })
+      });
 
+      const result = await response.json();
+      
+      if (result.success) {
+        // Add to recent scans with special status
+        const newScan = {
+          id: Date.now(),
+          trackingNumber,
+          timestamp: new Date().toISOString(),
+          status: 'on-hold',
+          message: 'Marked as On Hold in Detrack',
+          user: userName || userId
+        };
+
+        setRecentScans(prev => [newScan, ...prev.slice(0, 19)]);
+        setOnHoldInput('');
+      } else {
+        // Show error in recent scans
+        const errorScan = {
+          id: Date.now(),
+          trackingNumber,
+          timestamp: new Date().toISOString(),
+          status: 'error',
+          message: result.error || 'Failed to mark as On Hold',
+          user: userName || userId
+        };
+
+        setRecentScans(prev => [errorScan, ...prev.slice(0, 19)]);
+      }
+    } catch (error) {
+      console.error('Error marking as On Hold:', error);
+      
+      const errorScan = {
+        id: Date.now(),
+        trackingNumber,
+        timestamp: new Date().toISOString(),
+        status: 'error',
+        message: 'Failed to mark as On Hold',
+        user: userName || userId
+      };
+
+      setRecentScans(prev => [errorScan, ...prev.slice(0, 19)]);
+    }
+  }
+};
 
   // Monitor online/offline status
   useEffect(() => {
@@ -86,7 +148,7 @@ useEffect(() => {
   const customerStat = customerStats.find(stat => stat._id === customerName);
   return customerStat && customerStat.parcelCount > 1;
 };
-const sortedManifests = [...manifests].sort((a, b) => new Date(b.date) - new Date(a.date));
+
 
 
 useEffect(() => {
@@ -278,6 +340,7 @@ const fetchCustomerStats = async (manifestNumber = null) => {
       try {
         await submitScan(scan.trackingNumber, scan.timestamp);
         updateRecentScan(scan.id, { status: 'success', message: 'Synced successfully' });
+      // eslint-disable-next-line no-unused-vars
       } catch (error) {
         setPendingScans(prev => [...prev, scan]);
         updateRecentScan(scan.id, { status: 'error', message: 'Sync failed' });
@@ -286,6 +349,7 @@ const fetchCustomerStats = async (manifestNumber = null) => {
   };
 
 const submitScan = async (trackingNumber, timestamp) => {
+  // eslint-disable-next-line no-useless-catch
   try {
         console.log('🔍 FRONTEND: submitScan called with selectedProduct:', selectedProduct);
 
@@ -404,12 +468,6 @@ const extractCustomerName = (trackingNumber) => {
 const handleAutoScan = async (scannedNumber) => {
   if (!scannedNumber || scannedNumber.length < 3) return;
 
-  const scanData = {
-      scannedNumber,
-      timestamp: new Date().toISOString(),
-      scanId: Date.now(),
-      manifestNumber: selectedManifest
-    };
 
   const customerName = extractCustomerName(scannedNumber);
   if (!customerName) {
@@ -550,9 +608,11 @@ const getStatusIcon = (status) => {
     case 'error': return <AlertCircle style={{ ...iconStyle, color: '#EF4444' }} />;
     case 'pending': return <Package style={{ ...iconStyle, color: '#F59E0B' }} />;
     case 'warning': return <AlertTriangle style={{ ...iconStyle, color: '#F59E0B' }} />;
+    case 'on-hold': return <Pause style={{ ...iconStyle, color: '#3B82F6' }} />;
     default: return <div style={{ ...iconStyle, backgroundColor: '#D1D5DB', borderRadius: '9999px', animation: 'pulse 2s infinite' }} />;
   }
 };
+
 
 const getStatusColor = (status, trackingNumber) => {
   // Check if this is a multi-parcel customer first
@@ -571,9 +631,11 @@ const getStatusColor = (status, trackingNumber) => {
     case 'error': return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', color: '#991B1B' };
     case 'pending': return { backgroundColor: '#FFFBEB', borderColor: '#FDE68A', color: '#92400E' };
     case 'warning': return { backgroundColor: '#FEF3C7', borderColor: '#FCD34D', color: '#92400E' };
+    case 'on-hold': return { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', color: '#1E40AF' };
     default: return { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB', color: '#1F2937' };
   }
 };
+
 
   const containerStyle = {
     minHeight: '100vh',
@@ -1446,6 +1508,51 @@ const getStatusColor = (status, trackingNumber) => {
                 </p>
               </div>
             </div>
+            <div style={{ 
+  marginTop: '16px',
+  padding: '16px',
+  backgroundColor: '#F3F4F6',
+  borderRadius: '8px',
+  border: '1px solid #E5E7EB'
+}}>
+  <div>
+    <label style={{ 
+      display: 'block',
+      fontSize: '14px',
+      fontWeight: '500',
+      color: '#374151',
+      marginBottom: '8px'
+    }}>
+      Use if Parcel is Held by Customs
+    </label>
+    <input
+      type="text"
+      value={onHoldInput}
+      onChange={(e) => setOnHoldInput(e.target.value)}
+      onKeyDown={handleOnHoldInputKeyDown}
+      placeholder="Enter tracking number and press Enter"
+      style={{
+        width: '100%',
+        padding: '12px 16px',
+        border: '1px solid #D1D5DB',
+        borderRadius: '6px',
+        fontSize: '16px',
+        outline: 'none',
+        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
+        backgroundColor: 'white'
+      }}
+      ref={onHoldInputRef}
+    />
+    <p style={{ 
+      marginTop: '8px',
+      fontSize: '12px',
+      color: '#6B7280'
+    }}>
+      If item is approved and received, scan in the item as normal
+    </p>
+  </div>
+</div>
+
           </div>
         </div>
 
