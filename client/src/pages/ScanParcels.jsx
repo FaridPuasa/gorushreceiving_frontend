@@ -689,7 +689,7 @@ const getStatusColor = (status, trackingNumber) => {
               alignItems: 'center',
               gap: '8px',
               padding: '8px 12px',
-              backgroundColor: '#E5E7EB',
+              backgroundColor: 'black',
               border: 'none',
               borderRadius: '6px',
               cursor: 'pointer'
@@ -720,19 +720,7 @@ const getStatusColor = (status, trackingNumber) => {
         }}>
           <div style={cardStyle}>
             <h3 style={{ fontSize: '14px', color: '#6B7280', marginBottom: '8px' }}>Total Parcels</h3>
-            <p style={{ fontSize: '24px', fontWeight: '600' }}>{manifestDetails.totalParcels}</p>
-          </div>
-          <div style={cardStyle}>
-            <h3 style={{ fontSize: '14px', color: '#6B7280', marginBottom: '8px' }}>Received</h3>
-            <p style={{ fontSize: '24px', fontWeight: '600', color: '#10B981' }}>
-              {manifestDetails.receivedParcels}
-            </p>
-          </div>
-          <div style={cardStyle}>
-            <h3 style={{ fontSize: '14px', color: '#6B7280', marginBottom: '8px' }}>Completion</h3>
-            <p style={{ fontSize: '24px', fontWeight: '600' }}>
-              {Math.round((manifestDetails.receivedParcels / manifestDetails.totalParcels) * 100)}%
-            </p>
+            <p style={{ fontSize: '24px', fontWeight: '600' }}>{manifestDetails.__v}</p>
           </div>
         </div>
 
@@ -779,6 +767,7 @@ const getStatusColor = (status, trackingNumber) => {
                 <tr style={{ backgroundColor: '#F9FAFB' }}>
                   <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Tracking #</th>
                   <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Consignee</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Address</th>
                   <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Status</th>
                   <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Scanned By</th>
                   <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Time</th>
@@ -789,6 +778,7 @@ const getStatusColor = (status, trackingNumber) => {
                   <tr key={index} style={{ borderBottom: '1px solid #E5E7EB' }}>
                     <td style={{ padding: '12px' }}>{parcel.trackingNumber}</td>
                     <td style={{ padding: '12px' }}>{parcel.consigneeName}</td>
+                    <td style={{ padding: '12px' }}>{parcel.consigneeAddress}</td>
                     <td style={{ padding: '12px' }}>
                       {parcel.received ? (
                         <span style={{ 
@@ -1097,11 +1087,45 @@ const getStatusColor = (status, trackingNumber) => {
     color: !selectedManifest ? '#9CA3AF' : 'white',
     marginTop: '8px',
     width: '100%',
-    cursor: !selectedManifest ? 'not-allowed' : 'pointer'
+    cursor: !selectedManifest ? 'not-allowed' : 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '12px 16px'
   }}
 >
-  <Package size={16} />
-  <span>View Manifest Details</span>
+  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    <Package size={16} />
+    <span>View Manifest Details</span>
+  </div>
+  
+  {selectedManifest && (
+    <div style={{ 
+      display: 'flex', 
+      alignItems: 'center',
+      gap: '8px',
+      fontSize: '14px'
+    }}>
+      <span style={{ 
+        backgroundColor: '#EFF6FF',
+        color: '#2563EB',
+        padding: '4px 8px',
+        borderRadius: '9999px',
+        fontWeight: '500'
+      }}>
+        {manifests.find(m => m.manifestNumber === selectedManifest)?.receivedParcels || 0}
+        /
+        {manifests.find(m => m.manifestNumber === selectedManifest)?.totalParcels || 0}
+      </span>
+      <span style={{ fontWeight: '500' }}>
+        {selectedManifest === 'UNMANIFESTED' ? 'Unmanifested' : (
+          manifests.find(m => m.manifestNumber === selectedManifest)?.date 
+            ? new Date(manifests.find(m => m.manifestNumber === selectedManifest).date).toLocaleDateString() 
+            : 'No date'
+        )}
+      </span>
+    </div>
+  )}
 </button>
 </div>
 
