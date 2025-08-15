@@ -6,6 +6,8 @@ const ScanParcels = () => {
   const [isProcessingOnHold, setIsProcessingOnHold] = useState(false);
 const [onHoldInput, setOnHoldInput] = useState('');
 const onHoldInputRef = useRef(null);
+const [showLongBarcodeWarning, setShowLongBarcodeWarning] = useState(false);
+const [longBarcodeData, setLongBarcodeData] = useState(null);
   const [recentScans, setRecentScans] = useState([]);
   const [customerStats, setCustomerStats] = useState([]);
   const [userId] = useState(`scanner_${Math.random().toString(36).substr(2, 9)}`);
@@ -473,6 +475,21 @@ const extractCustomerName = (trackingNumber) => {
 const handleAutoScan = async (scannedNumber) => {
   if (!scannedNumber || scannedNumber.length < 3) return;
 
+  // Check if barcode is above 30 characters
+  if (scannedNumber.length > 30) {
+    // Show verification popup for long barcodes
+    const confirmed = await showLongBarcodeVerification(scannedNumber);
+    if (!confirmed) {
+      // User cancelled, clear the scan buffer and return
+      scanBuffer.current = '';
+      setScanInput('');
+      if (isScanning) {
+        inputRef.current?.focus();
+      }
+      return;
+    }
+  }
+
 
   const customerName = extractCustomerName(scannedNumber);
   if (!customerName) {
@@ -485,7 +502,7 @@ const handleAutoScan = async (scannedNumber) => {
   
   if (customerStat && customerStat.parcelCount > 1) {
     // Show warning and pause processing
-    setCurrentCustomer(customerName); // Now using the actual customer name
+    setCurrentCustomer(customerName);
     setCustomerParcelCount(customerStat.parcelCount);
     setPendingScanData({
       scannedNumber,
@@ -498,6 +515,25 @@ const handleAutoScan = async (scannedNumber) => {
 
   // Proceed with normal scan if no warning needed
   processScan(scannedNumber, new Date().toISOString(), Date.now());
+};
+
+const showLongBarcodeVerification = (barcode) => {
+  return new Promise((resolve) => {
+    setLongBarcodeData({
+      barcode: barcode,
+      onConfirm: () => {
+        setShowLongBarcodeWarning(false);
+        setLongBarcodeData(null);
+        resolve(true);
+      },
+      onCancel: () => {
+        setShowLongBarcodeWarning(false);
+        setLongBarcodeData(null);
+        resolve(false);
+      }
+    });
+    setShowLongBarcodeWarning(true);
+  });
 };
 
 const processScan = async (scannedNumber, timestamp, scanId) => {
@@ -919,6 +955,131 @@ const getStatusColor = (status, trackingNumber) => {
           </div>
         </div>
       )}
+
+      {showLongBarcodeWarning && longBarcodeData && (
+  <div style={{
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000
+  }}>
+    <div style={{
+      backgroundColor: 'white',
+      borderRadius: '12px',
+      padding: '24px',
+      maxWidth: '600px',
+      width: '90%',
+      boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+    }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '16px'
+      }}>
+        <h3 style={{
+          fontSize: '20px',
+          fontWeight: '600',
+          color: '#DC2626',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <AlertTriangle style={{ color: '#DC2626' }} />
+          Long Barcode Detected
+        </h3>
+        <button 
+          onClick={longBarcodeData.onCancel}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: '#6B7280'
+          }}
+        >
+          <X size={24} />
+        </button>
+      </div>
+      
+      <div style={{ marginBottom: '16px' }}>
+        <p style={{ marginBottom: '12px', lineHeight: '1.5', fontSize: '16px' }}>
+          The scanned barcode has <strong style={{ color: '#DC2626' }}>{longBarcodeData.barcode.length} characters</strong>, which is unusually long (over 30 characters).
+        </p>
+        
+        <div style={{
+          backgroundColor: '#F3F4F6',
+          padding: '12px',
+          borderRadius: '8px',
+          marginBottom: '16px',
+          border: '1px solid #D1D5DB'
+        }}>
+          <p style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', color: '#374151' }}>
+            Scanned Code:
+          </p>
+          <p style={{ 
+            fontSize: '14px', 
+            color: '#111827',
+            wordBreak: 'break-all',
+            fontFamily: 'monospace',
+            backgroundColor: 'white',
+            padding: '8px',
+            borderRadius: '4px',
+            border: '1px solid #E5E7EB'
+          }}>
+            {longBarcodeData.barcode}
+          </p>
+        </div>
+        
+        <p style={{ fontSize: '14px', color: '#4B5563', lineHeight: '1.5' }}>
+          Please verify this is the correct tracking number before proceeding. Long barcodes might contain extra data or formatting.
+        </p>
+      </div>
+      
+      <div style={{
+        display: 'flex',
+        gap: '12px',
+        justifyContent: 'flex-end'
+      }}>
+        <button
+          onClick={longBarcodeData.onCancel}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '8px',
+            border: '1px solid #D1D5DB',
+            background: 'white',
+            color: '#374151',
+            cursor: 'pointer',
+            fontWeight: '500',
+            fontSize: '14px'
+          }}
+        >
+          Cancel Scan
+        </button>
+        <button
+          onClick={longBarcodeData.onConfirm}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '8px',
+            border: 'none',
+            background: '#DC2626',
+            color: 'white',
+            cursor: 'pointer',
+            fontWeight: '500',
+            fontSize: '14px'
+          }}
+        >
+          Proceed with Scan
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
     {viewMode === 'manifest' ? (
       <ManifestDetailsView />
