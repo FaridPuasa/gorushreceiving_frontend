@@ -8,6 +8,8 @@ import ManifestScanTracker from './pages/ManifestScanTracker';
 import Upload from './pages/ManifestUpload';
 import LoginPage from './pages/LoginPage';
 import ProtectedRoute from './pages/ProtectedRoute';
+import MobileScanParcels from './pages/MobileScanParcels';
+
 
 const App = () => {
   return (
@@ -27,6 +29,8 @@ const App = () => {
             <Route path="/scan" element={<ScanParcels />} />
             <Route path="/manifestscan" element={<ManifestScanTracker />} />
           </Route>
+
+          <Route path="/mobilescan" element={<MobileScanParcels />} />
 
           {/* Redirect root to /upload */}
           <Route path="/" element={<Navigate to="/upload" replace />} />

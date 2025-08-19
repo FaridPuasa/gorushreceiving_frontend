@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Pause, Play, Package, CheckCircle, AlertCircle, Wifi, WifiOff, User, RefreshCw, AlertTriangle, X, Unlock, Lock } from 'lucide-react';
 
-const ScanParcels = () => {
+const MobileScanParcels = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [isProcessingOnHold, setIsProcessingOnHold] = useState(false);
 const [onHoldInput, setOnHoldInput] = useState('');
@@ -26,8 +26,6 @@ const [longBarcodeData, setLongBarcodeData] = useState(null);
   const [pendingScanData, setPendingScanData] = useState(null);
   const [manifests, setManifests] = useState([]);
   const [selectedManifest, setSelectedManifest] = useState('');
-  const [manifestDetails, setManifestDetails] = useState(null);
-  const [viewMode, setViewMode] = useState('scan');
   
   const inputRef = useRef(null);
   const scanBuffer = useRef('');
@@ -166,32 +164,6 @@ useEffect(() => {
 
   loadManifests();
 }, []);
-
-const loadManifestDetails = async (manifestNumber) => {
-  if (!manifestNumber) return;
-  
-  try {
-    const res = await fetch(`https://grscanningsystemserver.onrender.com/api/manifests/${encodeURIComponent(manifestNumber)}`);
-    const data = await res.json();
-    
-    if (data.success) {
-      // Also fetch the scan activity for this manifest
-      const activityRes = await fetch(`https://grscanningsystemserver.onrender.com/api/manifests/${encodeURIComponent(manifestNumber)}/scans`);
-      const activityData = await activityRes.json();
-      
-      setManifestDetails({
-        ...data.manifest,
-        scanActivity: activityData.success ? activityData.scanActivity : []
-      });
-      setViewMode('manifest');
-    } else {
-      throw new Error(data.error || 'Failed to load manifest details');
-    }
-  } catch (error) {
-    console.error('Error loading manifest details:', error);
-    // You might want to show an error message to the user here
-  }
-};
 
 useEffect(() => {
   const handleKeyPress = (e) => {
@@ -696,146 +668,6 @@ const getStatusColor = (status, trackingNumber) => {
     color: 'white'
   };
 
-    const ManifestDetailsView = () => {
-    if (!manifestDetails) return null;
-
-    return (
-      <div style={cardStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-          <button 
-            onClick={() => setViewMode('scan')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 12px',
-              backgroundColor: 'black',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer'
-            }}
-          >
-            <X size={16} />
-            <span>Back</span>
-          </button>
-          <h2 style={{ fontSize: '20px', fontWeight: '600' }}>
-            {manifestDetails.manifestNumber}
-          </h2>
-          <div style={{ 
-            backgroundColor: '#EFF6FF',
-            color: '#1E40AF',
-            padding: '4px 8px',
-            borderRadius: '9999px',
-            fontSize: '14px'
-          }}>
-            {manifestDetails.date ? new Date(manifestDetails.date).toLocaleDateString() : 'No date'}
-          </div>
-        </div>
-
-        <div style={{ 
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: '16px',
-          marginBottom: '24px'
-        }}>
-          <div style={cardStyle}>
-            <h3 style={{ fontSize: '14px', color: '#6B7280', marginBottom: '8px' }}>Total Parcels</h3>
-            <p style={{ fontSize: '24px', fontWeight: '600' }}>{manifestDetails.__v}</p>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>Scan Activity</h3>
-          <div style={{ 
-            maxHeight: '300px',
-            overflowY: 'auto',
-            border: '1px solid #E5E7EB',
-            borderRadius: '8px'
-          }}>
-            {manifestDetails.scanActivity.map((scan, index) => (
-              <div key={index} style={{ 
-                padding: '12px 16px',
-                borderBottom: '1px solid #E5E7EB',
-                backgroundColor: scan.received ? '#ECFDF5' : 'white'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <div>
-                    <p style={{ fontWeight: '500' }}>{scan.trackingNumber}</p>
-                    <p style={{ fontSize: '12px', color: '#6B7280' }}>
-                      {scan.consigneeName}
-                    </p>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <p style={{ fontSize: '12px' }}>
-                      {new Date(scan.timestamp).toLocaleTimeString()}
-                    </p>
-                    <p style={{ fontSize: '12px', color: '#6B7280' }}>
-                      {scan.user}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>All Parcels</h3>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#F9FAFB' }}>
-                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Tracking #</th>
-                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Consignee</th>
-                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Address</th>
-                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Status</th>
-                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Scanned By</th>
-                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px' }}>Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {manifestDetails.parcels.map((parcel, index) => (
-                  <tr key={index} style={{ borderBottom: '1px solid #E5E7EB' }}>
-                    <td style={{ padding: '12px' }}>{parcel.trackingNumber}</td>
-                    <td style={{ padding: '12px' }}>{parcel.consigneeName}</td>
-                    <td style={{ padding: '12px' }}>{parcel.consigneeAddress}</td>
-                    <td style={{ padding: '12px' }}>
-                      {parcel.received ? (
-                        <span style={{ 
-                          backgroundColor: '#ECFDF5',
-                          color: '#065F46',
-                          padding: '4px 8px',
-                          borderRadius: '9999px',
-                          fontSize: '12px'
-                        }}>
-                          Received
-                        </span>
-                      ) : (
-                        <span style={{ 
-                          backgroundColor: '#FEF2F2',
-                          color: '#92400E',
-                          padding: '4px 8px',
-                          borderRadius: '9999px',
-                          fontSize: '12px'
-                        }}>
-                          Pending
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: '12px' }}>{parcel.receivedBy || '-'}</td>
-                    <td style={{ padding: '12px' }}>
-                      {parcel.receivedAt ? new Date(parcel.receivedAt).toLocaleTimeString() : '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
 
   return (
     <div style={containerStyle}>
@@ -1221,57 +1053,6 @@ const getStatusColor = (status, trackingNumber) => {
     </>
   )}
 </select>
-
-  
-<button
-  onClick={() => loadManifestDetails(selectedManifest)}
-  disabled={!selectedManifest}
-  style={{
-    ...buttonStyle,
-    backgroundColor: !selectedManifest ? '#F3F4F6' : '#2563EB',
-    color: !selectedManifest ? '#9CA3AF' : 'white',
-    marginTop: '8px',
-    width: '100%',
-    cursor: !selectedManifest ? 'not-allowed' : 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '12px 16px'
-  }}
->
-  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-    <Package size={16} />
-    <span>View Manifest Details</span>
-  </div>
-  
-  {selectedManifest && (
-    <div style={{ 
-      display: 'flex', 
-      alignItems: 'center',
-      gap: '8px',
-      fontSize: '14px'
-    }}>
-      <span style={{ 
-        backgroundColor: '#EFF6FF',
-        color: '#2563EB',
-        padding: '4px 8px',
-        borderRadius: '9999px',
-        fontWeight: '500'
-      }}>
-        {manifests.find(m => m.manifestNumber === selectedManifest)?.receivedParcels || 0}
-        /
-        {manifests.find(m => m.manifestNumber === selectedManifest)?.totalParcels || 0}
-      </span>
-      <span style={{ fontWeight: '500' }}>
-        {selectedManifest === 'UNMANIFESTED' ? 'Unmanifested' : (
-          manifests.find(m => m.manifestNumber === selectedManifest)?.date 
-            ? new Date(manifests.find(m => m.manifestNumber === selectedManifest).date).toLocaleDateString() 
-            : 'No date'
-        )}
-      </span>
-    </div>
-  )}
-</button>
 </div>
 
             {/* User Setup and Controls */}
@@ -1305,7 +1086,7 @@ const getStatusColor = (status, trackingNumber) => {
                   value={userName}
                   onChange={(e) => saveUserName(e.target.value)}
                   style={{
-                    width: '100%',
+                    width: '90%',
                     padding: '8px 12px',
                     border: '1px solid #D1D5DB',
                     borderRadius: '6px',
@@ -1657,7 +1438,7 @@ const getStatusColor = (status, trackingNumber) => {
                   onKeyDown={handleScanInputKeyDown}
                   placeholder={isScanning ? "Scan barcode or type and press Enter" : "Start scanning to enable"}
                   style={{
-                    width: '100%',
+                    width: '85%',
                     padding: '12px 16px',
                     border: '1px solid #D1D5DB',
                     borderRadius: '6px',
@@ -1714,7 +1495,7 @@ const getStatusColor = (status, trackingNumber) => {
         onKeyDown={handleOnHoldInputKeyDown}
         placeholder="Enter tracking number and press Enter"
         style={{
-          width: '100%',
+          width: '70%',
           padding: '12px 16px',
           border: '1px solid #D1D5DB',
           borderRadius: '6px',
@@ -2174,4 +1955,4 @@ const getStatusColor = (status, trackingNumber) => {
   );
 };
 
-export default ScanParcels;
+export default MobileScanParcels;
