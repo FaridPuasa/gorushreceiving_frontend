@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Pause, Play, Package, CheckCircle, AlertCircle, Wifi, WifiOff, User, RefreshCw, AlertTriangle, X, Unlock, Lock } from 'lucide-react';
+import { Pause, Play, Package, CheckCircle, AlertCircle, Wifi, WifiOff, User, RefreshCw, AlertTriangle, X, Loader2, Unlock, Lock } from 'lucide-react';
 
 const MobileScanParcels = () => {
   const [isScanning, setIsScanning] = useState(false);
