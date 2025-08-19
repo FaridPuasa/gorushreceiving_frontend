@@ -897,1048 +897,1043 @@ const getStatusColor = (status, trackingNumber) => {
   </div>
 )}
 
-    {viewMode === 'manifest' ? (
-      <ManifestDetailsView />
-    ) : (
-      <>
-        {/* Header */}
-        <div style={{ maxWidth: '1280px', margin: '0 auto 24px' }}>
-          <div style={cardStyle}>
-            <div style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '16px', 
-              marginBottom: '24px'
-            }}>
-              <div>
-                <h1 style={{ 
-                  fontSize: '24px', 
-                  fontWeight: '700', 
-                  color: '#111827',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <Package style={{ color: '#2563EB' }} />
-                  <span>Parcel Scanner</span>
-                </h1>
-                <p style={{ 
-                  fontSize: '14px', 
-                  color: '#6B7280',
-                  marginTop: '4px'
-                }}>
-                  {isScanning ? 'Ready to scan packages' : 'Start scanning to process parcels'}
-                </p>
-              </div>
-              
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '16px'
-              }}>
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '8px',
-                  padding: '8px 12px',
-                  backgroundColor: '#F3F4F6',
-                  borderRadius: '8px'
-                }}>
-                  {isOnline ? (
-                    <>
-                      <Wifi style={{ width: '20px', height: '20px', color: '#10B981' }} />
-                      <span style={{ fontSize: '14px', color: '#059669' }}>Online</span>
-                    </>
-                  ) : (
-                    <>
-                      <WifiOff style={{ width: '20px', height: '20px', color: '#EF4444' }} />
-                      <span style={{ fontSize: '14px', color: '#DC2626' }}>Offline</span>
-                    </>
-                  )}
-                </div>
-                {pendingScans.length > 0 && (
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '8px',
-                    padding: '8px 12px',
-                    backgroundColor: '#FFFBEB',
-                    borderRadius: '8px',
-                    border: '1px solid #FDE68A'
-                  }}>
-                    <RefreshCw style={{ 
-                      width: '16px', 
-                      height: '16px', 
-                      color: '#D97706',
-                      animation: 'spin 1s linear infinite'
-                    }} />
-                    <span style={{ fontSize: '14px', color: '#92400E' }}>
-                      {pendingScans.length} pending sync
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {selectedManifest === 'UNMANIFESTED' && (
-  <div style={{ marginTop: '8px' }}>
-    <label style={{ 
-      display: 'block',
-      fontSize: '14px',
-      fontWeight: '500',
-      color: '#374151',
-      marginBottom: '8px'
-    }}>
-      Custom Manifest Name
-    </label>
-    <input
-      type="text"
-      value={customManifestName}
-      onChange={(e) => setCustomManifestName(e.target.value)}
-      placeholder="Enter custom manifest name"
-      style={{
-        width: '100%',
-        padding: '8px 12px',
-        border: '1px solid #D1D5DB',
-        borderRadius: '6px',
-        outline: 'none',
-        fontSize: '14px'
-      }}
-    />
-  </div>
-)}
-
-<div style={{ 
-  marginBottom: '16px',
-  backgroundColor: '#F9FAFB',
-  padding: '16px',
-  borderRadius: '8px',
-  border: '1px solid #E5E7EB'
-}}>
-<label style={{ 
-  display: 'block',
-  fontSize: '14px',
-  fontWeight: '500',
-  color: '#374151',
-  marginBottom: '8px'
-}}>
-  Select Manifest
-</label>
-<select
-  value={selectedManifest}
-  onChange={(e) => setSelectedManifest(e.target.value)}
-  style={{
-    width: '100%',
-    padding: '10px 12px',
-    border: '1px solid #D1D5DB',
-    borderRadius: '6px',
-    fontSize: '14px',
-    outline: 'none',
-    backgroundColor: 'white'
-  }}
-  disabled={manifests.length === 0}
->
-  {manifests.length === 0 ? (
-    <option value="">Loading manifests...</option>
-  ) : (
-    <>
-      <option value="">Select a manifest</option>
-      <option value="UNMANIFESTED">Unmanifested Parcels</option>
-      {manifests.map(manifest => (
-        <option key={manifest.manifestNumber} value={manifest.manifestNumber}>
-          {manifest.manifestNumber} ({manifest.date ? new Date(manifest.date).toLocaleDateString() : 'No date'}) - 
-          {manifest.receivedParcels}/{manifest.totalParcels} parcels
-        </option>
-      ))}
-    </>
-  )}
-</select>
-</div>
-
-            {/* User Setup and Controls */}
-            <div style={{ 
-              display: 'grid',
-              gridTemplateColumns: '1fr',
-              gap: '24px'
-            }}>
-              {/* User Profile */}
-              <div style={{ 
-                backgroundColor: '#F9FAFB',
-                padding: '16px',
-                borderRadius: '8px',
-                border: '1px solid #E5E7EB'
-              }}>
-                <label style={{ 
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#374151',
-                  marginBottom: '8px',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <User style={{ width: '16px', height: '16px' }} />
-                  <span>Operator</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter your name"
-                  value={userName}
-                  onChange={(e) => saveUserName(e.target.value)}
-                  style={{
-                    width: '90%',
-                    padding: '8px 12px',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '6px',
-                    outline: 'none',
-                    fontSize: '14px'
-                  }}
-                />
-                
-                <div style={{ 
-                  marginTop: '8px',
-                  fontSize: '12px',
-                  color: '#6B7280'
-                }}>
-                  {userName ? `Operator ID: ${userId}` : 'Please enter your name'}
-                </div>
-              </div>
-
-<div style={{
-  maxWidth: '400px',
-  margin: '0 auto',
-  padding: '24px',
-  backgroundColor: 'white'
-}}>
-  {/* Warning Banner - Only shows when unlocked */}
-  {!productLocked && (
-    <div style={{
-      marginBottom: '24px',
-      padding: '16px',
-      backgroundColor: '#fef3c7',
-      border: '2px solid #f59e0b',
-      borderRadius: '12px',
-      display: 'flex',
-      alignItems: 'flex-start',
-      gap: '12px',
-      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-    }}>
-      <AlertTriangle 
-        style={{ 
-          color: '#d97706', 
-          marginTop: '2px',
-          flexShrink: 0 
-        }} 
-        size={24} 
-      />
-      <div>
-        <h3 style={{
-          fontWeight: '700',
-          color: '#92400e',
-          fontSize: '16px',
-          marginBottom: '6px',
-          margin: 0
-        }}>
-          Critical Selection Required
-        </h3>
-        <p style={{
-          color: '#a16207',
-          fontSize: '14px',
-          lineHeight: '1.5',
-          margin: 0
-        }}>
-          Please select your product carefully. This cannot be changed after confirmation.
-        </p>
-      </div>
-    </div>
-  )}
-
-  <div>
-    <label style={{
-      display: 'block',
-      fontSize: '18px',
-      fontWeight: '700',
-      color: '#111827',
-      marginBottom: '16px'
-    }}>
-      Select Your Product *
-    </label>
-    
-    {/* Lock toggle button */}
-    {selectedProduct && (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'flex-end',
-        marginBottom: '8px'
+<>
+  {/* Header */}
+  <div style={{ maxWidth: '1280px', margin: '0 auto 24px' }}>
+    <div style={cardStyle}>
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: '16px', 
+        marginBottom: '24px'
       }}>
-        <button
-          onClick={() => setProductLocked(!productLocked)}
-          style={{
+        <div>
+          <h1 style={{ 
+            fontSize: '24px', 
+            fontWeight: '700', 
+            color: '#111827',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
-            padding: '6px 12px',
-            backgroundColor: productLocked ? '#dcfce7' : '#fef3c7',
-            border: `2px solid ${productLocked ? '#16a34a' : '#f59e0b'}`,
-            borderRadius: '20px',
-            cursor: 'pointer',
-            fontWeight: '600',
+            gap: '8px'
+          }}>
+            <Package style={{ color: '#2563EB' }} />
+            <span>Parcel Scanner</span>
+          </h1>
+          <p style={{ 
+            fontSize: '14px', 
+            color: '#6B7280',
+            marginTop: '4px'
+          }}>
+            {isScanning ? 'Ready to scan packages' : 'Start scanning to process parcels'}
+          </p>
+        </div>
+        
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '16px'
+        }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px',
+            padding: '8px 12px',
+            backgroundColor: '#F3F4F6',
+            borderRadius: '8px'
+          }}>
+            {isOnline ? (
+              <>
+                <Wifi style={{ width: '20px', height: '20px', color: '#10B981' }} />
+                <span style={{ fontSize: '14px', color: '#059669' }}>Online</span>
+              </>
+            ) : (
+              <>
+                <WifiOff style={{ width: '20px', height: '20px', color: '#EF4444' }} />
+                <span style={{ fontSize: '14px', color: '#DC2626' }}>Offline</span>
+              </>
+            )}
+          </div>
+          {pendingScans.length > 0 && (
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              padding: '8px 12px',
+              backgroundColor: '#FFFBEB',
+              borderRadius: '8px',
+              border: '1px solid #FDE68A'
+            }}>
+              <RefreshCw style={{ 
+                width: '16px', 
+                height: '16px', 
+                color: '#D97706',
+                animation: 'spin 1s linear infinite'
+              }} />
+              <span style={{ fontSize: '14px', color: '#92400E' }}>
+                {pendingScans.length} pending sync
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {selectedManifest === 'UNMANIFESTED' && (
+        <div style={{ marginTop: '8px' }}>
+          <label style={{ 
+            display: 'block',
             fontSize: '14px',
-            color: productLocked ? '#166534' : '#92400e'
+            fontWeight: '500',
+            color: '#374151',
+            marginBottom: '8px'
+          }}>
+            Custom Manifest Name
+          </label>
+          <input
+            type="text"
+            value={customManifestName}
+            onChange={(e) => setCustomManifestName(e.target.value)}
+            placeholder="Enter custom manifest name"
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              border: '1px solid #D1D5DB',
+              borderRadius: '6px',
+              outline: 'none',
+              fontSize: '14px'
+            }}
+          />
+        </div>
+      )}
+
+      <div style={{ 
+        marginBottom: '16px',
+        backgroundColor: '#F9FAFB',
+        padding: '16px',
+        borderRadius: '8px',
+        border: '1px solid #E5E7EB'
+      }}>
+        <label style={{ 
+          display: 'block',
+          fontSize: '14px',
+          fontWeight: '500',
+          color: '#374151',
+          marginBottom: '8px'
+        }}>
+          Select Manifest
+        </label>
+        <select
+          value={selectedManifest}
+          onChange={(e) => setSelectedManifest(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '10px 12px',
+            border: '1px solid #D1D5DB',
+            borderRadius: '6px',
+            fontSize: '14px',
+            outline: 'none',
+            backgroundColor: 'white'
           }}
+          disabled={manifests.length === 0}
         >
-          {productLocked ? (
-            <>
-              <Lock size={16} />
-              <span>Locked</span>
-            </>
+          {manifests.length === 0 ? (
+            <option value="">Loading manifests...</option>
           ) : (
             <>
-              <Unlock size={16} />
-              <span>Unlocked</span>
+              <option value="">Select a manifest</option>
+              <option value="UNMANIFESTED">Unmanifested Parcels</option>
+              {manifests.map(manifest => (
+                <option key={manifest.manifestNumber} value={manifest.manifestNumber}>
+                  {manifest.manifestNumber} ({manifest.date ? new Date(manifest.date).toLocaleDateString() : 'No date'}) - 
+                  {manifest.receivedParcels}/{manifest.totalParcels} parcels
+                </option>
+              ))}
             </>
           )}
-        </button>
+        </select>
       </div>
-    )}
 
-    <select
-      value={selectedProduct}
-      onChange={(e) => setSelectedProduct(e.target.value)}
-      disabled={productLocked}
-      style={{
-        width: '100%',
-        padding: '16px',
-        fontSize: '16px',
-        fontWeight: '600',
-        border: `3px solid ${productLocked ? '#d1d5db' : '#3b82f6'}`,
-        borderRadius: '12px',
-        backgroundColor: productLocked ? '#f3f4f6' : 'white',
-        outline: 'none',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        transition: 'all 0.2s ease',
-        cursor: productLocked ? 'not-allowed' : 'pointer',
-        opacity: productLocked ? 0.8 : 1
-      }}
-      onFocus={(e) => {
-        if (!productLocked) {
-          e.target.style.borderColor = '#1d4ed8';
-          e.target.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.2)';
-        }
-      }}
-      onBlur={(e) => {
-        if (!productLocked) {
-          e.target.style.borderColor = '#3b82f6';
-          e.target.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
-        }
-      }}
-      onMouseEnter={(e) => {
-        if (!productLocked && e.target !== document.activeElement) {
-          e.target.style.borderColor = '#2563eb';
-          e.target.style.boxShadow = '0 6px 12px rgba(0, 0, 0, 0.15)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!productLocked && e.target !== document.activeElement) {
-          e.target.style.borderColor = '#3b82f6';
-          e.target.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
-        }
-      }}
-    >
-      <option value="" style={{ color: '#6b7280', fontWeight: 'normal' }}>
-        -- Please select a product --
-      </option>
-      <option value="mglobal" style={{ fontWeight: '600', padding: '8px' }}>MGlobal</option>
-      <option value="pdu" style={{ fontWeight: '600', padding: '8px' }}>PDU</option>
-      <option value="ewe" style={{ fontWeight: '600', padding: '8px' }}>EWE</option>
-      <option value="MOH" style={{ fontWeight: '600', padding: '8px' }}>MOH</option>
-      <option value="JPMC" style={{ fontWeight: '600', padding: '8px' }}>JPMC</option>
-    </select>
-
-    {selectedProduct && (
-      <div style={{
-        marginTop: '16px',
-        padding: '14px',
-        backgroundColor: productLocked ? '#dcfce7' : '#e0f2fe',
-        border: `2px solid ${productLocked ? '#16a34a' : '#0ea5e9'}`,
-        borderRadius: '10px',
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
+      {/* User Setup and Controls */}
+      <div style={{ 
+        display: 'grid',
+        gridTemplateColumns: '1fr',
+        gap: '24px'
       }}>
-        <p style={{
-          color: productLocked ? '#15803d' : '#0369a1',
-          fontSize: '15px',
-          fontWeight: '600',
-          margin: 0
+        {/* User Profile */}
+        <div style={{ 
+          backgroundColor: '#F9FAFB',
+          padding: '16px',
+          borderRadius: '8px',
+          border: '1px solid #E5E7EB'
         }}>
-          {productLocked ? '✓ Locked: ' : '✓ Selected: '}
-          <span style={{ fontWeight: '700', textTransform: 'uppercase' }}>
-            {selectedProduct}
-          </span>
-        </p>
-        
-        {productLocked && (
-          <span style={{
-            backgroundColor: '#16a34a',
-            color: 'white',
-            padding: '4px 8px',
-            borderRadius: '9999px',
-            fontSize: '12px',
-            fontWeight: '700'
+          <label style={{ 
+            display: 'block',
+            fontSize: '14px',
+            fontWeight: '500',
+            color: '#374151',
+            marginBottom: '8px',
+            alignItems: 'center',
+            gap: '8px'
           }}>
-            LOCKED
-          </span>
-        )}
-      </div>
-    )}
+            <User style={{ width: '16px', height: '16px' }} />
+            <span>Operator</span>
+          </label>
+          <input
+            type="text"
+            placeholder="Enter your name"
+            value={userName}
+            onChange={(e) => saveUserName(e.target.value)}
+            style={{
+              width: '90%',
+              padding: '8px 12px',
+              border: '1px solid #D1D5DB',
+              borderRadius: '6px',
+              outline: 'none',
+              fontSize: '14px'
+            }}
+          />
+          
+          <div style={{ 
+            marginTop: '8px',
+            fontSize: '12px',
+            color: '#6B7280'
+          }}>
+            {userName ? `Operator ID: ${userId}` : 'Please enter your name'}
+          </div>
+        </div>
 
-    {!selectedProduct && (
-      <div style={{
-        marginTop: '16px',
-        padding: '14px',
-        backgroundColor: '#fef2f2',
-        border: '2px solid #dc2626',
-        borderRadius: '10px',
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-      }}>
-        <p style={{
-          color: '#dc2626',
-          fontSize: '15px',
-          fontWeight: '600',
-          margin: 0
+        <div style={{
+          maxWidth: '400px',
+          margin: '0 auto',
+          padding: '24px',
+          backgroundColor: 'white'
         }}>
-          ⚠ Product selection is required to continue
-        </p>
-      </div>
-    )}
-  </div>
-</div>
-
-              {/* Scanner Controls */}
-              <div style={{ 
-                backgroundColor: '#EFF6FF',
-                padding: '16px',
-                borderRadius: '8px',
-                border: '1px solid #BFDBFE'
-              }}>
-                <div style={{ 
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '8px'
+          {/* Warning Banner - Only shows when unlocked */}
+          {!productLocked && (
+            <div style={{
+              marginBottom: '24px',
+              padding: '16px',
+              backgroundColor: '#fef3c7',
+              border: '2px solid #f59e0b',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            }}>
+              <AlertTriangle 
+                style={{ 
+                  color: '#d97706', 
+                  marginTop: '2px',
+                  flexShrink: 0 
+                }} 
+                size={24} 
+              />
+              <div>
+                <h3 style={{
+                  fontWeight: '700',
+                  color: '#92400e',
+                  fontSize: '16px',
+                  marginBottom: '6px',
+                  margin: 0
                 }}>
-                  <h3 style={{ 
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: '#1E40AF'
-                  }}>
-                    Scanner Controls
-                  </h3>
-                  <div style={{ 
+                  Critical Selection Required
+                </h3>
+                <p style={{
+                  color: '#a16207',
+                  fontSize: '14px',
+                  lineHeight: '1.5',
+                  margin: 0
+                }}>
+                  Please select your product carefully. This cannot be changed after confirmation.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '18px',
+              fontWeight: '700',
+              color: '#111827',
+              marginBottom: '16px'
+            }}>
+              Select Your Product *
+            </label>
+            
+            {/* Lock toggle button */}
+            {selectedProduct && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                marginBottom: '8px'
+              }}>
+                <button
+                  onClick={() => setProductLocked(!productLocked)}
+                  style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    backgroundColor: productLocked ? '#dcfce7' : '#fef3c7',
+                    border: `2px solid ${productLocked ? '#16a34a' : '#f59e0b'}`,
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    fontWeight: '600',
                     fontSize: '14px',
-                    color: '#2563EB'
-                  }}>
-                    <Package style={{ width: '16px', height: '16px' }} />
-                    <span>{scanCount} scans</span>
-                  </div>
-                </div>
-                <button
-                  onClick={toggleScanning}
-                  style={scanButtonStyle}
+                    color: productLocked ? '#166534' : '#92400e'
+                  }}
                 >
-                  {isScanning ? (
+                  {productLocked ? (
                     <>
-                      <Pause style={{ width: '20px', height: '20px' }} />
-                      <span>Stop Scanning</span>
+                      <Lock size={16} />
+                      <span>Locked</span>
                     </>
                   ) : (
                     <>
-                      <Play style={{ width: '20px', height: '20px' }} />
-                      <span>Start Scanning</span>
+                      <Unlock size={16} />
+                      <span>Unlocked</span>
                     </>
                   )}
                 </button>
               </div>
+            )}
 
-              {/* Scanner Status */}
-              <div style={{ 
+            <select
+              value={selectedProduct}
+              onChange={(e) => setSelectedProduct(e.target.value)}
+              disabled={productLocked}
+              style={{
+                width: '100%',
                 padding: '16px',
-                borderRadius: '8px',
-                border: '1px solid',
-                ...(isScanning 
-                  ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }
-                  : { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB' }
-                )
+                fontSize: '16px',
+                fontWeight: '600',
+                border: `3px solid ${productLocked ? '#d1d5db' : '#3b82f6'}`,
+                borderRadius: '12px',
+                backgroundColor: productLocked ? '#f3f4f6' : 'white',
+                outline: 'none',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.2s ease',
+                cursor: productLocked ? 'not-allowed' : 'pointer',
+                opacity: productLocked ? 0.8 : 1
+              }}
+              onFocus={(e) => {
+                if (!productLocked) {
+                  e.target.style.borderColor = '#1d4ed8';
+                  e.target.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.2)';
+                }
+              }}
+              onBlur={(e) => {
+                if (!productLocked) {
+                  e.target.style.borderColor = '#3b82f6';
+                  e.target.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+                }
+              }}
+              onMouseEnter={(e) => {
+                if (!productLocked && e.target !== document.activeElement) {
+                  e.target.style.borderColor = '#2563eb';
+                  e.target.style.boxShadow = '0 6px 12px rgba(0, 0, 0, 0.15)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!productLocked && e.target !== document.activeElement) {
+                  e.target.style.borderColor = '#3b82f6';
+                  e.target.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+                }
+              }}
+            >
+              <option value="" style={{ color: '#6b7280', fontWeight: 'normal' }}>
+                -- Please select a product --
+              </option>
+              <option value="mglobal" style={{ fontWeight: '600', padding: '8px' }}>MGlobal</option>
+              <option value="pdu" style={{ fontWeight: '600', padding: '8px' }}>PDU</option>
+              <option value="ewe" style={{ fontWeight: '600', padding: '8px' }}>EWE</option>
+              <option value="MOH" style={{ fontWeight: '600', padding: '8px' }}>MOH</option>
+              <option value="JPMC" style={{ fontWeight: '600', padding: '8px' }}>JPMC</option>
+            </select>
+
+            {selectedProduct && (
+              <div style={{
+                marginTop: '16px',
+                padding: '14px',
+                backgroundColor: productLocked ? '#dcfce7' : '#e0f2fe',
+                border: `2px solid ${productLocked ? '#16a34a' : '#0ea5e9'}`,
+                borderRadius: '10px',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
               }}>
-                <h3 style={{ 
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  marginBottom: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  ...(isScanning 
-                    ? { color: '#065F46' }
-                    : { color: '#374151' }
-                  )
+                <p style={{
+                  color: productLocked ? '#15803d' : '#0369a1',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  margin: 0
                 }}>
-                  {isScanning ? (
-                    <>
-                      <div style={{ 
-                        width: '8px',
-                        height: '8px',
-                        backgroundColor: '#10B981',
-                        borderRadius: '9999px',
-                        animation: 'pulse 2s infinite'
-                      }}></div>
-                      <span>Scanner Active</span>
-                    </>
-                  ) : (
-                    <span>Scanner Status</span>
-                  )}
-                </h3>
-                <p style={{ 
-                  fontSize: '12px',
-                  color: isScanning ? '#047857' : '#6B7280'
+                  {productLocked ? '✓ Locked: ' : '✓ Selected: '}
+                  <span style={{ fontWeight: '700', textTransform: 'uppercase' }}>
+                    {selectedProduct}
+                  </span>
+                </p>
+                
+                {productLocked && (
+                  <span style={{
+                    backgroundColor: '#16a34a',
+                    color: 'white',
+                    padding: '4px 8px',
+                    borderRadius: '9999px',
+                    fontSize: '12px',
+                    fontWeight: '700'
+                  }}>
+                    LOCKED
+                  </span>
+                )}
+              </div>
+            )}
+
+            {!selectedProduct && (
+              <div style={{
+                marginTop: '16px',
+                padding: '14px',
+                backgroundColor: '#fef2f2',
+                border: '2px solid #dc2626',
+                borderRadius: '10px',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+              }}>
+                <p style={{
+                  color: '#dc2626',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  margin: 0
                 }}>
-                  {isScanning 
-                    ? 'Ready to scan barcodes. Use your barcode scanner or type codes directly.'
-                    : 'Scanner is currently inactive. Click "Start Scanning" to begin.'}
+                  ⚠ Product selection is required to continue
                 </p>
               </div>
-            </div>
-
-            {/* Scan Input Field */}
-            <div style={{ 
-              marginTop: '24px',
-              padding: '16px',
-              backgroundColor: '#F3F4F6',
-              borderRadius: '8px',
-              border: '1px solid #E5E7EB'
-            }}>
-              <div>
-                <label style={{ 
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#374151',
-                  marginBottom: '8px'
-                }}>
-                  Scan or Type Tracking Number
-                </label>
-                <input
-                  type="text"
-                  value={scanInput}
-                  onChange={handleScanInputChange}
-                  onKeyDown={handleScanInputKeyDown}
-                  placeholder={isScanning ? "Scan barcode or type and press Enter" : "Start scanning to enable"}
-                  style={{
-                    width: '85%',
-                    padding: '12px 16px',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '6px',
-                    fontSize: '16px',
-                    outline: 'none',
-                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
-                    backgroundColor: isScanning ? 'white' : '#F3F4F6',
-                    cursor: isScanning ? 'text' : 'not-allowed'
-                  }}
-                  disabled={!isScanning}
-                  ref={inputRef}
-                  autoFocus={isScanning}
-                />
-                <p style={{ 
-                  marginTop: '8px',
-                  fontSize: '12px',
-                  color: '#6B7280'
-                }}>
-                  {isScanning 
-                    ? 'Scan barcodes automatically or type and press Enter'
-                    : 'Enable scanning to use this field'}
-                </p>
-              </div>
-            </div>
-            <div style={{ 
-  marginTop: '16px',
-  padding: '16px',
-  backgroundColor: '#F3F4F6',
-  borderRadius: '8px',
-  border: '1px solid #E5E7EB'
-}}>
-<div style={{ 
-  marginTop: '16px',
-  padding: '16px',
-  backgroundColor: '#F3F4F6',
-  borderRadius: '8px',
-  border: '1px solid #E5E7EB'
-}}>
-  <div>
-    <label style={{ 
-      display: 'block',
-      fontSize: '14px',
-      fontWeight: '500',
-      color: '#374151',
-      marginBottom: '8px'
-    }}>
-      Use if Parcel is Held by Customs
-    </label>
-    <div style={{ position: 'relative' }}>
-      <input
-        type="text"
-        value={onHoldInput}
-        onChange={(e) => setOnHoldInput(e.target.value)}
-        onKeyDown={handleOnHoldInputKeyDown}
-        placeholder="Enter tracking number and press Enter"
-        style={{
-          width: '70%',
-          padding: '12px 16px',
-          border: '1px solid #D1D5DB',
-          borderRadius: '6px',
-          fontSize: '16px',
-          outline: 'none',
-          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
-          backgroundColor: 'white',
-          paddingRight: '40px' // Add space for loading indicator
-        }}
-        ref={onHoldInputRef}
-        disabled={isProcessingOnHold} // Disable while processing
-      />
-      {isProcessingOnHold && (
-        <div style={{
-          position: 'absolute',
-          right: '12px',
-          top: '50%',
-          transform: 'translateY(-50%)'
-        }}>
-          <RefreshCw 
-            size={20} 
-            className="animate-spin" 
-            style={{ color: '#3B82F6' }} 
-          />
-        </div>
-      )}
-    </div>
-    <p style={{ 
-      marginTop: '8px',
-      fontSize: '12px',
-      color: '#6B7280'
-    }}>
-      If item is approved and received, scan in the item as normal
-    </p>
-  </div>
-</div>
-</div>
-
+            )}
           </div>
         </div>
 
-        {/* Main Content */}
+        {/* Scanner Controls */}
         <div style={{ 
-          maxWidth: '1280px',
-          margin: '0 auto',
-          display: 'grid',
-          gridTemplateColumns: '1fr',
-          gap: '24px'
+          backgroundColor: '#EFF6FF',
+          padding: '16px',
+          borderRadius: '8px',
+          border: '1px solid #BFDBFE'
         }}>
-          {/* Recent Scans */}
           <div style={{ 
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            overflow: 'hidden'
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '8px'
           }}>
-            <div style={{ 
-              padding: '24px',
-              borderBottom: '1px solid #E5E7EB'
-            }}>
-              <div style={{ 
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-              }}>
-                <h2 style={{ 
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: '#111827'
-                }}>
-                  Recent Scans
-                </h2>
-                <span style={{ 
-                  fontSize: '12px',
-                  backgroundColor: '#F3F4F6',
-                  color: '#4B5563',
-                  padding: '4px 8px',
-                  borderRadius: '9999px'
-                }}>
-                  {recentScans.length} items
-                </span>
-              </div>
-            </div>
-            <div style={{ 
-              maxHeight: '500px',
-              overflowY: 'auto'
-            }}>
-              {recentScans.length === 0 ? (
-  <div style={{ 
-    padding: '32px 24px', 
-    textAlign: 'center',
-    color: '#6B7280',
-    fontSize: '14px'
-  }}>
-    <Package style={{ 
-      width: '48px', 
-      height: '48px', 
-      color: '#E5E7EB',
-      marginBottom: '12px'
-    }} />
-    <p style={{ fontWeight: '500' }}>No scans yet</p>
-    <p>Start scanning to see activity here</p>
-  </div>
-) : (
-  <table style={{ 
-    width: '100%', 
-    borderCollapse: 'collapse',
-    tableLayout: 'fixed'
-  }}>
-    <thead style={{ 
-      backgroundColor: '#F9FAFB',
-      position: 'sticky',
-      top: 0,
-      zIndex: 10
-    }}>
-      <tr>
-        <th style={{ 
-          padding: '12px 16px',
-          textAlign: 'left',
-          fontSize: '12px',
-          fontWeight: '500',
-          color: '#6B7280',
-          borderBottom: '1px solid #E5E7EB',
-          width: '30%'
-        }}>
-          Tracking Number
-        </th>
-        <th style={{ 
-          padding: '12px 16px',
-          textAlign: 'left',
-          fontSize: '12px',
-          fontWeight: '500',
-          color: '#6B7280',
-          borderBottom: '1px solid #E5E7EB',
-          width: '25%'
-        }}>
-          Customer
-        </th>
-        <th style={{ 
-          padding: '12px 16px',
-          textAlign: 'left',
-          fontSize: '12px',
-          fontWeight: '500',
-          color: '#6B7280',
-          borderBottom: '1px solid #E5E7EB',
-          width: '20%'
-        }}>
-          Time
-        </th>
-        <th style={{ 
-          padding: '12px 16px',
-          textAlign: 'left',
-          fontSize: '12px',
-          fontWeight: '500',
-          color: '#6B7280',
-          borderBottom: '1px solid #E5E7EB',
-          width: '25%'
-        }}>
-          Status
-        </th>
-      </tr>
-    </thead>
-    <tbody>
-      {recentScans.map((scan) => {
-        const customerName = extractCustomerName(scan.trackingNumber);
-        const isMultiParcel = customerName && isMultiParcelCustomer(scan.trackingNumber);
-        const statusStyle = getStatusColor(scan.status, scan.trackingNumber);
-        
-        return (
-          <tr 
-            key={scan.id} 
-            style={{ 
-              borderBottom: '1px solid #E5E7EB',
-              ':hover': { backgroundColor: '#F9FAFB' }
-            }}
-          >
-            <td style={{ 
-              padding: '16px',
+            <h3 style={{ 
               fontSize: '14px',
               fontWeight: '500',
-              color: '#111827',
-              wordBreak: 'break-word'
+              color: '#1E40AF'
             }}>
-              {scan.trackingNumber}
-            </td>
-            <td style={{ 
-              padding: '16px',
+              Scanner Controls
+            </h3>
+            <div style={{ 
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
               fontSize: '14px',
-              color: '#6B7280',
-              wordBreak: 'break-word'
+              color: '#2563EB'
             }}>
-              {customerName || 'Unknown'}
-              {isMultiParcel && (
-                <span style={{ 
-                  display: 'inline-block',
-                  marginLeft: '8px',
-                  backgroundColor: '#EDE9FE',
-                  color: '#5B21B6',
-                  padding: '2px 6px',
-                  borderRadius: '9999px',
-                  fontSize: '12px',
-                  fontWeight: '500'
-                }}>
-                  Multi
-                </span>
-              )}
-            </td>
-            <td style={{ 
-              padding: '16px',
-              fontSize: '14px',
-              color: '#6B7280'
-            }}>
-              {new Date(scan.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </td>
-            <td style={{ padding: '16px' }}>
-              <div style={{ 
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                border: `1px solid ${statusStyle.borderColor}`,
-                backgroundColor: statusStyle.backgroundColor,
-                color: statusStyle.color,
-                fontSize: '14px'
-              }}>
-                {getStatusIcon(scan.status)}
-                <span>{scan.message}</span>
-              </div>
-            </td>
-          </tr>
-        );
-      })}
-    </tbody>
-  </table>
-)}
+              <Package style={{ width: '16px', height: '16px' }} />
+              <span>{scanCount} scans</span>
             </div>
           </div>
-
-          {/* Customer Stats */}
-          <div style={{ 
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            overflow: 'hidden'
-          }}>
-            <div style={{ 
-              padding: '24px',
-              borderBottom: '1px solid #E5E7EB'
-            }}>
-              <div style={{ 
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-              }}>
-                <h2 style={{ 
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: '#111827'
-                }}>
-                  Customer Statistics
-                </h2>
-              </div>
-            </div>
-            <div style={{ overflowX: 'auto' }}>
-            <table style={{ minWidth: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
-              <thead style={{ backgroundColor: '#F9FAFB' }}>
-                <tr>
-                  <th style={{ 
-                    padding: '12px 24px',
-                    textAlign: 'left',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    color: '#6B7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    borderBottom: '1px solid #E5E7EB'
-                  }}>
-                    Customer
-                  </th>
-                  <th style={{ 
-                    padding: '12px 24px',
-                    textAlign: 'left',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    color: '#6B7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    borderBottom: '1px solid #E5E7EB'
-                  }}>
-                    Total
-                  </th>
-                  <th style={{ 
-                    padding: '12px 24px',
-                    textAlign: 'left',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    color: '#6B7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    borderBottom: '1px solid #E5E7EB'
-                  }}>
-                    Received
-                  </th>
-                  <th style={{ 
-                    padding: '12px 24px',
-                    textAlign: 'left',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    color: '#6B7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    borderBottom: '1px solid #E5E7EB'
-                  }}>
-                    Rate
-                  </th>
-                </tr>
-              </thead>
- <tbody style={{ backgroundColor: 'white' }}>
-  {!selectedManifest ? (
-    <tr>
-      <td colSpan="4" style={{ padding: '32px 24px', textAlign: 'center' }}>
-        <h3 style={{ 
-          marginTop: '8px',
-          fontSize: '14px',
-          fontWeight: '500',
-          color: '#111827'
-        }}>
-          No manifest selected
-        </h3>
-        <p style={{ 
-          marginTop: '4px',
-          fontSize: '14px',
-          color: '#6B7280'
-        }}>
-          Please select a manifest to view customer statistics
-        </p>
-      </td>
-    </tr>
-  ) : isLoadingStats ? (
-    <tr>
-      <td colSpan="4" style={{ padding: '24px', textAlign: 'center' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-          <RefreshCw className="animate-spin" size={16} />
-          <span>Loading customer statistics...</span>
+          <button
+            onClick={toggleScanning}
+            style={scanButtonStyle}
+          >
+            {isScanning ? (
+              <>
+                <Pause style={{ width: '20px', height: '20px' }} />
+                <span>Stop Scanning</span>
+              </>
+            ) : (
+              <>
+                <Play style={{ width: '20px', height: '20px' }} />
+                <span>Start Scanning</span>
+              </>
+            )}
+          </button>
         </div>
-      </td>
-    </tr>
-  ) : customerStats.length === 0 ? (
-    <tr>
-      <td colSpan="4" style={{ padding: '32px 24px', textAlign: 'center' }}>
-        <h3 style={{ 
-          marginTop: '8px',
-          fontSize: '14px',
-          fontWeight: '500',
-          color: '#111827'
+
+        {/* Scanner Status */}
+        <div style={{ 
+          padding: '16px',
+          borderRadius: '8px',
+          border: '1px solid',
+          ...(isScanning 
+            ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }
+            : { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB' }
+          )
         }}>
-          No customer data found
-        </h3>
-        <p style={{ 
-          marginTop: '4px',
-          fontSize: '14px',
-          color: '#6B7280'
+          <h3 style={{ 
+            fontSize: '14px',
+            fontWeight: '500',
+            marginBottom: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            ...(isScanning 
+              ? { color: '#065F46' }
+              : { color: '#374151' }
+            )
+          }}>
+            {isScanning ? (
+              <>
+                <div style={{ 
+                  width: '8px',
+                  height: '8px',
+                  backgroundColor: '#10B981',
+                  borderRadius: '9999px',
+                  animation: 'pulse 2s infinite'
+                }}></div>
+                <span>Scanner Active</span>
+              </>
+            ) : (
+              <span>Scanner Status</span>
+            )}
+          </h3>
+          <p style={{ 
+            fontSize: '12px',
+            color: isScanning ? '#047857' : '#6B7280'
+          }}>
+            {isScanning 
+              ? 'Ready to scan barcodes. Use your barcode scanner or type codes directly.'
+              : 'Scanner is currently inactive. Click "Start Scanning" to begin.'}
+          </p>
+        </div>
+      </div>
+
+      {/* Scan Input Field */}
+      <div style={{ 
+        marginTop: '24px',
+        padding: '16px',
+        backgroundColor: '#F3F4F6',
+        borderRadius: '8px',
+        border: '1px solid #E5E7EB'
+      }}>
+        <div>
+          <label style={{ 
+            display: 'block',
+            fontSize: '14px',
+            fontWeight: '500',
+            color: '#374151',
+            marginBottom: '8px'
+          }}>
+            Scan or Type Tracking Number
+          </label>
+          <input
+            type="text"
+            value={scanInput}
+            onChange={handleScanInputChange}
+            onKeyDown={handleScanInputKeyDown}
+            placeholder={isScanning ? "Scan barcode or type and press Enter" : "Start scanning to enable"}
+            style={{
+              width: '85%',
+              padding: '12px 16px',
+              border: '1px solid #D1D5DB',
+              borderRadius: '6px',
+              fontSize: '16px',
+              outline: 'none',
+              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
+              backgroundColor: isScanning ? 'white' : '#F3F4F6',
+              cursor: isScanning ? 'text' : 'not-allowed'
+            }}
+            disabled={!isScanning}
+            ref={inputRef}
+            autoFocus={isScanning}
+          />
+          <p style={{ 
+            marginTop: '8px',
+            fontSize: '12px',
+            color: '#6B7280'
+          }}>
+            {isScanning 
+              ? 'Scan barcodes automatically or type and press Enter'
+              : 'Enable scanning to use this field'}
+          </p>
+        </div>
+      </div>
+      <div style={{ 
+        marginTop: '16px',
+        padding: '16px',
+        backgroundColor: '#F3F4F6',
+        borderRadius: '8px',
+        border: '1px solid #E5E7EB'
+      }}>
+        <div style={{ 
+          marginTop: '16px',
+          padding: '16px',
+          backgroundColor: '#F3F4F6',
+          borderRadius: '8px',
+          border: '1px solid #E5E7EB'
         }}>
-          No parcels found in manifest {selectedManifest}
-        </p>
-      </td>
-    </tr>
-  ) : (
-    customerStats.map((stat, index) => (
-                    <tr key={index} style={{ 
-                      borderBottom: '1px solid #E5E7EB',
-                      transition: 'background-color 0.2s',
-                      ':hover': { backgroundColor: '#F9FAFB' }
-                    }}>
-                      <td style={{ 
-                        padding: '16px 24px',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        color: '#111827',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {stat._id}
-                      </td>
-                      <td style={{ 
-                        padding: '16px 24px',
-                        fontSize: '14px',
-                        color: '#6B7280',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {stat.parcelCount}
-                      </td>
-                      <td style={{ 
-                        padding: '16px 24px',
-                        fontSize: '14px',
-                        color: '#6B7280',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {stat.receivedCount}
-                      </td>
-                      <td style={{ 
-                        padding: '16px 24px',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        <div style={{ 
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px'
-                        }}>
-                          <div style={{ 
-                            width: '80px',
-                            backgroundColor: '#E5E7EB',
-                            borderRadius: '9999px',
-                            height: '8px'
-                          }}>
-                            <div 
-                              style={{ 
-                                backgroundColor: '#2563EB',
-                                height: '8px',
-                                borderRadius: '9999px',
-                                width: `${(stat.receivedCount / stat.parcelCount) * 100}%`
-                              }}
-                            ></div>
-                          </div>
-                          <span style={{ 
-                            fontSize: '12px',
-                            fontWeight: '500',
-                            color: '#6B7280'
-                          }}>
-                            {Math.round((stat.receivedCount / stat.parcelCount) * 100)}%
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <div>
+            <label style={{ 
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#374151',
+              marginBottom: '8px'
+            }}>
+              Use if Parcel is Held by Customs
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                value={onHoldInput}
+                onChange={(e) => setOnHoldInput(e.target.value)}
+                onKeyDown={handleOnHoldInputKeyDown}
+                placeholder="Enter tracking number and press Enter"
+                style={{
+                  width: '70%',
+                  padding: '12px 16px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  fontSize: '16px',
+                  outline: 'none',
+                  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
+                  backgroundColor: 'white',
+                  paddingRight: '40px' // Add space for loading indicator
+                }}
+                ref={onHoldInputRef}
+                disabled={isProcessingOnHold} // Disable while processing
+              />
+              {isProcessingOnHold && (
+                <div style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)'
+                }}>
+                  <RefreshCw 
+                    size={20} 
+                    className="animate-spin" 
+                    style={{ color: '#3B82F6' }} 
+                  />
+                </div>
+              )}
+            </div>
+            <p style={{ 
+              marginTop: '8px',
+              fontSize: '12px',
+              color: '#6B7280'
+            }}>
+              If item is approved and received, scan in the item as normal
+            </p>
           </div>
         </div>
       </div>
-      </>
-    )}
+    </div>
+  </div>
+
+  {/* Main Content */}
+  <div style={{ 
+    maxWidth: '1280px',
+    margin: '0 auto',
+    display: 'grid',
+    gridTemplateColumns: '1fr',
+    gap: '24px'
+  }}>
+    {/* Recent Scans */}
+    <div style={{ 
+      backgroundColor: 'white',
+      borderRadius: '12px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+      overflow: 'hidden'
+    }}>
+      <div style={{ 
+        padding: '24px',
+        borderBottom: '1px solid #E5E7EB'
+      }}>
+        <div style={{ 
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <h2 style={{ 
+            fontSize: '18px',
+            fontWeight: '600',
+            color: '#111827'
+          }}>
+            Recent Scans
+          </h2>
+          <span style={{ 
+            fontSize: '12px',
+            backgroundColor: '#F3F4F6',
+            color: '#4B5563',
+            padding: '4px 8px',
+            borderRadius: '9999px'
+          }}>
+            {recentScans.length} items
+          </span>
+        </div>
+      </div>
+      <div style={{ 
+        maxHeight: '500px',
+        overflowY: 'auto'
+      }}>
+        {recentScans.length === 0 ? (
+          <div style={{ 
+            padding: '32px 24px', 
+            textAlign: 'center',
+            color: '#6B7280',
+            fontSize: '14px'
+          }}>
+            <Package style={{ 
+              width: '48px', 
+              height: '48px', 
+              color: '#E5E7EB',
+              marginBottom: '12px'
+            }} />
+            <p style={{ fontWeight: '500' }}>No scans yet</p>
+            <p>Start scanning to see activity here</p>
+          </div>
+        ) : (
+          <table style={{ 
+            width: '100%', 
+            borderCollapse: 'collapse',
+            tableLayout: 'fixed'
+          }}>
+            <thead style={{ 
+              backgroundColor: '#F9FAFB',
+              position: 'sticky',
+              top: 0,
+              zIndex: 10
+            }}>
+              <tr>
+                <th style={{ 
+                  padding: '12px 16px',
+                  textAlign: 'left',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  color: '#6B7280',
+                  borderBottom: '1px solid #E5E7EB',
+                  width: '30%'
+                }}>
+                  Tracking Number
+                </th>
+                <th style={{ 
+                  padding: '12px 16px',
+                  textAlign: 'left',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  color: '#6B7280',
+                  borderBottom: '1px solid #E5E7EB',
+                  width: '25%'
+                }}>
+                  Customer
+                </th>
+                <th style={{ 
+                  padding: '12px 16px',
+                  textAlign: 'left',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  color: '#6B7280',
+                  borderBottom: '1px solid #E5E7EB',
+                  width: '20%'
+                }}>
+                  Time
+                </th>
+                <th style={{ 
+                  padding: '12px 16px',
+                  textAlign: 'left',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  color: '#6B7280',
+                  borderBottom: '1px solid #E5E7EB',
+                  width: '25%'
+                }}>
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentScans.map((scan) => {
+                const customerName = extractCustomerName(scan.trackingNumber);
+                const isMultiParcel = customerName && isMultiParcelCustomer(scan.trackingNumber);
+                const statusStyle = getStatusColor(scan.status, scan.trackingNumber);
+                
+                return (
+                  <tr 
+                    key={scan.id} 
+                    style={{ 
+                      borderBottom: '1px solid #E5E7EB',
+                      ':hover': { backgroundColor: '#F9FAFB' }
+                    }}
+                  >
+                    <td style={{ 
+                      padding: '16px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      color: '#111827',
+                      wordBreak: 'break-word'
+                    }}>
+                      {scan.trackingNumber}
+                    </td>
+                    <td style={{ 
+                      padding: '16px',
+                      fontSize: '14px',
+                      color: '#6B7280',
+                      wordBreak: 'break-word'
+                    }}>
+                      {customerName || 'Unknown'}
+                      {isMultiParcel && (
+                        <span style={{ 
+                          display: 'inline-block',
+                          marginLeft: '8px',
+                          backgroundColor: '#EDE9FE',
+                          color: '#5B21B6',
+                          padding: '2px 6px',
+                          borderRadius: '9999px',
+                          fontSize: '12px',
+                          fontWeight: '500'
+                        }}>
+                          Multi
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ 
+                      padding: '16px',
+                      fontSize: '14px',
+                      color: '#6B7280'
+                    }}>
+                      {new Date(scan.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td style={{ padding: '16px' }}>
+                      <div style={{ 
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: `1px solid ${statusStyle.borderColor}`,
+                        backgroundColor: statusStyle.backgroundColor,
+                        color: statusStyle.color,
+                        fontSize: '14px'
+                      }}>
+                        {getStatusIcon(scan.status)}
+                        <span>{scan.message}</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+
+    {/* Customer Stats */}
+    <div style={{ 
+      backgroundColor: 'white',
+      borderRadius: '12px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+      overflow: 'hidden'
+    }}>
+      <div style={{ 
+        padding: '24px',
+        borderBottom: '1px solid #E5E7EB'
+      }}>
+        <div style={{ 
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <h2 style={{ 
+            fontSize: '18px',
+            fontWeight: '600',
+            color: '#111827'
+          }}>
+            Customer Statistics
+          </h2>
+        </div>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ minWidth: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+          <thead style={{ backgroundColor: '#F9FAFB' }}>
+            <tr>
+              <th style={{ 
+                padding: '12px 24px',
+                textAlign: 'left',
+                fontSize: '12px',
+                fontWeight: '500',
+                color: '#6B7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                borderBottom: '1px solid #E5E7EB'
+              }}>
+                Customer
+              </th>
+              <th style={{ 
+                padding: '12px 24px',
+                textAlign: 'left',
+                fontSize: '12px',
+                fontWeight: '500',
+                color: '#6B7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                borderBottom: '1px solid #E5E7EB'
+              }}>
+                Total
+              </th>
+              <th style={{ 
+                padding: '12px 24px',
+                textAlign: 'left',
+                fontSize: '12px',
+                fontWeight: '500',
+                color: '#6B7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                borderBottom: '1px solid #E5E7EB'
+              }}>
+                Received
+              </th>
+              <th style={{ 
+                padding: '12px 24px',
+                textAlign: 'left',
+                fontSize: '12px',
+                fontWeight: '500',
+                color: '#6B7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                borderBottom: '1px solid #E5E7EB'
+              }}>
+                Rate
+              </th>
+            </tr>
+          </thead>
+          <tbody style={{ backgroundColor: 'white' }}>
+            {!selectedManifest ? (
+              <tr>
+                <td colSpan="4" style={{ padding: '32px 24px', textAlign: 'center' }}>
+                  <h3 style={{ 
+                    marginTop: '8px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#111827'
+                  }}>
+                    No manifest selected
+                  </h3>
+                  <p style={{ 
+                    marginTop: '4px',
+                    fontSize: '14px',
+                    color: '#6B7280'
+                  }}>
+                    Please select a manifest to view customer statistics
+                  </p>
+                </td>
+              </tr>
+            ) : isLoadingStats ? (
+              <tr>
+                <td colSpan="4" style={{ padding: '24px', textAlign: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
+                    <RefreshCw className="animate-spin" size={16} />
+                    <span>Loading customer statistics...</span>
+                  </div>
+                </td>
+              </tr>
+            ) : customerStats.length === 0 ? (
+              <tr>
+                <td colSpan="4" style={{ padding: '32px 24px', textAlign: 'center' }}>
+                  <h3 style={{ 
+                    marginTop: '8px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#111827'
+                  }}>
+                    No customer data found
+                  </h3>
+                  <p style={{ 
+                    marginTop: '4px',
+                    fontSize: '14px',
+                    color: '#6B7280'
+                  }}>
+                    No parcels found in manifest {selectedManifest}
+                  </p>
+                </td>
+              </tr>
+            ) : (
+              customerStats.map((stat, index) => (
+                <tr key={index} style={{ 
+                  borderBottom: '1px solid #E5E7EB',
+                  transition: 'background-color 0.2s',
+                  ':hover': { backgroundColor: '#F9FAFB' }
+                }}>
+                  <td style={{ 
+                    padding: '16px 24px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#111827',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {stat._id}
+                  </td>
+                  <td style={{ 
+                    padding: '16px 24px',
+                    fontSize: '14px',
+                    color: '#6B7280',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {stat.parcelCount}
+                  </td>
+                  <td style={{ 
+                    padding: '16px 24px',
+                    fontSize: '14px',
+                    color: '#6B7280',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {stat.receivedCount}
+                  </td>
+                  <td style={{ 
+                    padding: '16px 24px',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    <div style={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px'
+                    }}>
+                      <div style={{ 
+                        width: '80px',
+                        backgroundColor: '#E5E7EB',
+                        borderRadius: '9999px',
+                        height: '8px'
+                      }}>
+                        <div 
+                          style={{ 
+                            backgroundColor: '#2563EB',
+                            height: '8px',
+                            borderRadius: '9999px',
+                            width: `${(stat.receivedCount / stat.parcelCount) * 100}%`
+                          }}
+                        ></div>
+                      </div>
+                      <span style={{ 
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        color: '#6B7280'
+                      }}>
+                        {Math.round((stat.receivedCount / stat.parcelCount) * 100)}%
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</>
 
       {/* Global styles for animations */}
       <style>{`
