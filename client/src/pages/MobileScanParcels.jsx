@@ -434,35 +434,25 @@ const extractCustomerName = (trackingNumber) => {
 const handleAutoScan = async (scannedNumber) => {
   if (!scannedNumber || scannedNumber.length < 3) return;
 
-  // Check if barcode is above 30 characters
+  // Check for long barcode first
   if (scannedNumber.length > 30) {
-    // Show verification popup for long barcodes
     const confirmed = await showLongBarcodeVerification(scannedNumber);
     if (!confirmed) {
-      // User cancelled, clear the scan buffer and return
       scanBuffer.current = '';
       setScanInput('');
-      if (isScanning) {
-        inputRef.current?.focus();
-      }
+      if (isScanning) inputRef.current?.focus();
       return;
     }
   }
 
-
+  // Check if this is a multi-parcel customer
   const customerName = extractCustomerName(scannedNumber);
-  if (!customerName) {
-    // If customer not found, proceed with normal scan
-    processScan(scannedNumber, new Date().toISOString(), Date.now());
-    return;
-  }
-
-  const customerStat = customerStats.find(stat => stat._id === customerName);
-  
-  if (customerStat && customerStat.parcelCount > 1) {
-    // Show warning and pause processing
+  if (customerName && isMultiParcelCustomer(scannedNumber)) {
+    // Show multi-parcel warning first
     setCurrentCustomer(customerName);
-    setCustomerParcelCount(customerStat.parcelCount);
+    setCustomerParcelCount(
+      customerStats.find(stat => stat._id === customerName)?.parcelCount || 0
+    );
     setPendingScanData({
       scannedNumber,
       timestamp: new Date().toISOString(),
@@ -472,8 +462,13 @@ const handleAutoScan = async (scannedNumber) => {
     return;
   }
 
-  // Proceed with normal scan if no warning needed
-  processScan(scannedNumber, new Date().toISOString(), Date.now());
+  // For normal scans, show confirmation popup
+  setScanToConfirm({
+    trackingNumber: scannedNumber,
+    customerName,
+    isMultiParcel: false
+  });
+  setShowScanConfirmation(true);
 };
 
   const confirmAndProcessScan = async () => {
