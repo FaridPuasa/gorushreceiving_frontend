@@ -273,9 +273,6 @@ const ManifestScanTracker = () => {
 
   useEffect(() => {
     fetchManifests();
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchManifests, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   // Get scan statistics for a manifest
