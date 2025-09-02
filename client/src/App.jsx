@@ -9,12 +9,14 @@ import Upload from './pages/ManifestUpload';
 import LoginPage from './pages/LoginPage';
 import ProtectedRoute from './pages/ProtectedRoute';
 import MobileScanParcels from './pages/MobileScanParcels';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 
 const App = () => {
   return (
     <Router>
       <AuthProvider>
+        <SpeedInsights/>
         <Routes>
           {/* Login route (unprotected) */}
           <Route path="/loginwarehouse" element={<LoginPage />} />
