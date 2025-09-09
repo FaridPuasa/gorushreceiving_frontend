@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Package, 
   CheckCircle, 
@@ -12,8 +12,7 @@ import {
   AlertCircle,
   Filter,
   Download,
-  Printer,
-  X
+  Printer
 } from 'lucide-react';
 
 const ManifestScanTracker = () => {
@@ -55,74 +54,49 @@ const ManifestScanTracker = () => {
       flexDirection: 'column',
       gap: '12px'
     },
-    searchContainer: {
-      position: 'relative',
-      width: '100%'
-    },
     searchInput: {
       paddingLeft: '40px',
-      paddingRight: '40px',
-      paddingTop: '12px',
-      paddingBottom: '12px',
+      paddingRight: '16px',
+      paddingTop: '8px',
+      paddingBottom: '8px',
       border: '1px solid #d1d5db',
       borderRadius: '8px',
       outline: 'none',
-      fontSize: '16px',
-      width: '100%',
-      boxSizing: 'border-box'
-    },
-    searchIcon: {
-      position: 'absolute',
-      left: '12px',
-      top: '50%',
-      transform: 'translateY(-50%)',
-      color: '#9ca3af'
-    },
-    clearButton: {
-      position: 'absolute',
-      right: '12px',
-      top: '50%',
-      transform: 'translateY(-50%)',
-      background: 'none',
-      border: 'none',
-      color: '#9ca3af',
-      cursor: 'pointer',
-      padding: '4px'
+      fontSize: '14px',
+      width: '100%'
     },
     filterSelect: {
       paddingLeft: '40px',
       paddingRight: '16px',
-      paddingTop: '12px',
-      paddingBottom: '12px',
+      paddingTop: '8px',
+      paddingBottom: '8px',
       border: '1px solid #d1d5db',
       borderRadius: '8px',
       outline: 'none',
-      fontSize: '16px',
-      appearance: 'none',
-      width: '100%',
-      boxSizing: 'border-box'
+      fontSize: '14px',
+      appearance: 'none'
     },
     primaryButton: {
       display: 'inline-flex',
       alignItems: 'center',
-      padding: '12px 20px',
+      padding: '8px 16px',
       border: 'none',
       borderRadius: '8px',
       backgroundColor: '#2563eb',
       color: 'white',
-      fontSize: '16px',
+      fontSize: '14px',
       fontWeight: '500',
       cursor: 'pointer'
     },
     secondaryButton: {
       display: 'inline-flex',
       alignItems: 'center',
-      padding: '12px 20px',
+      padding: '8px 16px',
       border: 'none',
       borderRadius: '8px',
       backgroundColor: '#f3f4f6',
       color: '#374151',
-      fontSize: '16px',
+      fontSize: '14px',
       fontWeight: '500',
       cursor: 'pointer'
     },
@@ -267,11 +241,6 @@ const ManifestScanTracker = () => {
       border: '1px solid #fecaca',
       borderRadius: '8px',
       padding: '16px'
-    },
-    searchPrompt: {
-      textAlign: 'center',
-      padding: '48px',
-      color: '#6b7280'
     }
   };
 
@@ -284,7 +253,10 @@ const ManifestScanTracker = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc');
-  const [hasSearched, setHasSearched] = useState(false);
+  const [itemsPerPage] = useState(5);
+  const [displayedItems, setDisplayedItems] = useState(5);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
 
   // Fetch manifests data
   const fetchManifests = async () => {
@@ -306,22 +278,6 @@ const ManifestScanTracker = () => {
   useEffect(() => {
     fetchManifests();
   }, []);
-
-  // Handle search input change
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-    if (e.target.value.length > 0) {
-      setHasSearched(true);
-    } else {
-      setHasSearched(false);
-    }
-  };
-
-  // Clear search
-  const clearSearch = () => {
-    setSearchTerm('');
-    setHasSearched(false);
-  };
 
   // Get scan statistics for a manifest
   const getManifestStats = (manifest) => {
@@ -355,54 +311,56 @@ const ManifestScanTracker = () => {
     });
   };
 
-  const exportToCSV = (manifest) => {
-    const stats = getManifestStats(manifest);
-    
-    // Create CSV header
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += `Manifest Number,${manifest.manifestNumber}\n`;
-    csvContent += `Product,${manifest.product || 'N/A'}\n`;
-    csvContent += `Created At,${formatDate(manifest.createdAt)}\n`;
-    csvContent += `Status,${stats.percentage}% Complete\n`;
-    csvContent += `Total Parcels,${stats.total}\n`;
-    csvContent += `Scanned Parcels,${stats.scanned}\n`;
-    csvContent += `Pending Parcels,${stats.pending}\n\n`;
-    
-    // Add scanned parcels section
-    if (stats.scanned > 0) {
-      csvContent += `Scanned Parcels (${stats.scanned})\n`;
-      csvContent += "Tracking Number,Consignee Name,Received At,Received By\n";
-      manifest.parcels
-        .filter(p => p.received)
-        .forEach(p => {
-          csvContent += `${p.trackingNumber},"${p.consigneeName}",${p.receivedAt ? formatDate(p.receivedAt) : ''},"${p.receivedBy || ''}"\n`;
-        });
-      csvContent += '\n';
-    }
-    
-    // Add pending parcels section
-    if (stats.pending > 0) {
-      csvContent += `Pending Parcels (${stats.pending})\n`;
-      csvContent += "Tracking Number,Consignee Name,Shipment Date\n";
-      manifest.parcels
-        .filter(p => !p.received)
-        .forEach(p => {
-          csvContent += `${p.trackingNumber},"${p.consigneeName}",${p.shipmentDate ? formatDate(p.shipmentDate) : ''}\n`;
-        });
-    }
-    
-    // Create download link
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `${manifest.manifestNumber}_scan_report.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+const exportToCSV = (manifest) => {
+  const stats = getManifestStats(manifest);
+  
+  // Create CSV header
+  let csvContent = "data:text/csv;charset=utf-8,";
+  csvContent += `Manifest Number,${manifest.manifestNumber}\n`;
+  csvContent += `Product,${manifest.product || 'N/A'}\n`;
+  csvContent += `Created At,${formatDate(manifest.createdAt)}\n`;
+  csvContent += `Status,${stats.percentage}% Complete\n`;
+  csvContent += `Total Parcels,${stats.total}\n`;
+  csvContent += `Scanned Parcels,${stats.scanned}\n`;
+  csvContent += `Pending Parcels,${stats.pending}\n\n`;
+  
+  // Add scanned parcels section
+  if (stats.scanned > 0) {
+    csvContent += `Scanned Parcels (${stats.scanned})\n`;
+    csvContent += "Tracking Number,Consignee Name,Received At,Received By\n";
+    manifest.parcels
+      .filter(p => p.received)
+      .forEach(p => {
+        csvContent += `${p.trackingNumber},"${p.consigneeName}",${p.receivedAt ? formatDate(p.receivedAt) : ''},"${p.receivedBy || ''}"\n`;
+      });
+    csvContent += '\n';
+  }
+  
+  // Add pending parcels section
+  if (stats.pending > 0) {
+    csvContent += `Pending Parcels (${stats.pending})\n`;
+    csvContent += "Tracking Number,Consignee Name,Shipment Date\n";
+    manifest.parcels
+      .filter(p => !p.received)
+      .forEach(p => {
+        csvContent += `${p.trackingNumber},"${p.consigneeName}",${p.shipmentDate ? formatDate(p.shipmentDate) : ''}\n`;
+      });
+  }
+  
+  // Create download link
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `${manifest.manifestNumber}_scan_report.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 
   // Filter and sort manifests
-  const filteredManifests = manifests
+const filteredManifests = useMemo(() => {
+  return manifests
     .filter(manifest => {
       // Search filter
       const matchesSearch = manifest.manifestNumber.toLowerCase().includes(searchTerm.toLowerCase());
@@ -437,6 +395,23 @@ const ManifestScanTracker = () => {
       }
       return 0;
     });
+}, [manifests, searchTerm, filterStatus, sortBy, sortOrder]);
+
+// Get currently displayed manifests
+const displayedManifests = filteredManifests.slice(0, displayedItems);
+
+useEffect(() => {
+  setDisplayedItems(itemsPerPage);
+}, [searchTerm, filterStatus, sortBy, sortOrder, itemsPerPage]);
+
+const loadMore = () => {
+  setIsLoadingMore(true);
+  // Simulate loading delay for better UX
+  setTimeout(() => {
+    setDisplayedItems(prev => Math.min(prev + itemsPerPage, filteredManifests.length));
+    setIsLoadingMore(false);
+  }, 500);
+};
 
   // Get status color based on completion percentage
   const getStatusColor = (percentage) => {
@@ -500,25 +475,20 @@ const ManifestScanTracker = () => {
           <div style={styles.header}>
             <div>
               <h1 style={styles.headerTitle}>Manifest Scan Tracker</h1>
-              <p style={styles.headerSubtitle}>Search and track scanning progress for manifests</p>
+              <p style={styles.headerSubtitle}>Track scanning progress for all manifests</p>
             </div>
             
             <div style={styles.headerActions}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={styles.searchContainer}>
-                  <Search style={styles.searchIcon} />
+                <div style={{ position: 'relative' }}>
+                  <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
                   <input
                     type="text"
-                    placeholder="Search by manifest number..."
+                    placeholder="Search manifests..."
                     value={searchTerm}
-                    onChange={handleSearchChange}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                     style={styles.searchInput}
                   />
-                  {searchTerm && (
-                    <button onClick={clearSearch} style={styles.clearButton}>
-                      <X style={{ width: '18px', height: '18px' }} />
-                    </button>
-                  )}
                 </div>
                 
                 <div style={{ position: 'relative' }}>
@@ -547,329 +517,367 @@ const ManifestScanTracker = () => {
           </div>
         </div>
 
-        {/* Summary Cards - Only show when we have search results */}
-        {hasSearched && filteredManifests.length > 0 && (
-          <div style={styles.statsGrid}>
-            <div style={styles.statCard}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{ ...styles.statIcon, backgroundColor: '#dbeafe', color: '#2563eb' }}>
-                  <Package style={{ width: '24px', height: '24px' }} />
-                </div>
-                <div style={{ marginLeft: '16px' }}>
-                  <p style={styles.statLabel}>Matching Manifests</p>
-                  <p style={styles.statValue}>{filteredManifests.length}</p>
-                </div>
+        {/* Summary Cards */}
+        <div style={styles.statsGrid}>
+          <div style={styles.statCard}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{ ...styles.statIcon, backgroundColor: '#dbeafe', color: '#2563eb' }}>
+                <Package style={{ width: '24px', height: '24px' }} />
               </div>
-            </div>
-            
-            <div style={styles.statCard}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{ ...styles.statIcon, backgroundColor: '#dcfce7', color: '#16a34a' }}>
-                  <CheckCircle style={{ width: '24px', height: '24px' }} />
-                </div>
-                <div style={{ marginLeft: '16px' }}>
-                  <p style={styles.statLabel}>Completed</p>
-                  <p style={styles.statValue}>
-                    {filteredManifests.filter(m => getManifestStats(m).percentage === 100).length}
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            <div style={styles.statCard}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{ ...styles.statIcon, backgroundColor: '#fef3c7', color: '#d97706' }}>
-                  <Clock style={{ width: '24px', height: '24px' }} />
-                </div>
-                <div style={{ marginLeft: '16px' }}>
-                  <p style={styles.statLabel}>In Progress</p>
-                  <p style={styles.statValue}>
-                    {filteredManifests.filter(m => {
-                      const stats = getManifestStats(m);
-                      return stats.percentage > 0 && stats.percentage < 100;
-                    }).length}
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            <div style={styles.statCard}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{ ...styles.statIcon, backgroundColor: '#fee2e2', color: '#dc2626' }}>
-                  <Package style={{ width: '24px', height: '24px' }} />
-                </div>
-                <div style={{ marginLeft: '16px' }}>
-                  <p style={styles.statLabel}>Not Started</p>
-                  <p style={styles.statValue}>
-                    {filteredManifests.filter(m => getManifestStats(m).percentage === 0).length}
-                  </p>
-                </div>
+              <div style={{ marginLeft: '16px' }}>
+                <p style={styles.statLabel}>Total Manifests</p>
+                <p style={styles.statValue}>{manifests.length}</p>
               </div>
             </div>
           </div>
-        )}
-
-        {/* Sorting Controls - Only show when we have search results */}
-        {hasSearched && filteredManifests.length > 0 && (
-          <div style={styles.sortingControls}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '14px', fontWeight: '500', color: '#6b7280' }}>Sort by:</span>
-              <button
-                onClick={() => {
-                  setSortBy('date');
-                  setSortOrder(sortBy === 'date' ? (sortOrder === 'asc' ? 'desc' : 'asc') : 'desc');
-                }}
-                style={{
-                  ...styles.sortButton,
-                  ...(sortBy === 'date' ? styles.activeSortButton : {})
-                }}
-              >
-                Date {sortBy === 'date' && (sortOrder === 'asc' ? <ChevronUp style={{ display: 'inline', marginLeft: '4px' }} /> : <ChevronDown style={{ display: 'inline', marginLeft: '4px' }} />)}
-              </button>
-              <button
-                onClick={() => {
-                  setSortBy('completion');
-                  setSortOrder(sortBy === 'completion' ? (sortOrder === 'asc' ? 'desc' : 'asc') : 'desc');
-                }}
-                style={{
-                  ...styles.sortButton,
-                  ...(sortBy === 'completion' ? styles.activeSortButton : {})
-                }}
-              >
-                Completion {sortBy === 'completion' && (sortOrder === 'asc' ? <ChevronUp style={{ display: 'inline', marginLeft: '4px' }} /> : <ChevronDown style={{ display: 'inline', marginLeft: '4px' }} />)}
-              </button>
+          
+          <div style={styles.statCard}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{ ...styles.statIcon, backgroundColor: '#dcfce7', color: '#16a34a' }}>
+                <CheckCircle style={{ width: '24px', height: '24px' }} />
+              </div>
+              <div style={{ marginLeft: '16px' }}>
+                <p style={styles.statLabel}>Completed</p>
+                <p style={styles.statValue}>
+                  {manifests.filter(m => getManifestStats(m).percentage === 100).length}
+                </p>
+              </div>
             </div>
           </div>
-        )}
-
-        {/* Search Prompt - Show when no search has been performed */}
-        {!hasSearched && (
-          <div style={styles.searchPrompt}>
-            <Search style={{ width: '48px', height: '48px', color: '#d1d5db', margin: '0 auto 16px' }} />
-            <h3 style={{ fontSize: '18px', fontWeight: '500', color: '#6b7280', marginBottom: '8px' }}>
-              Search for manifests
-            </h3>
-            <p style={{ color: '#9ca3af' }}>
-              Enter a manifest number in the search box above to view scanning progress
-            </p>
+          
+          <div style={styles.statCard}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{ ...styles.statIcon, backgroundColor: '#fef3c7', color: '#d97706' }}>
+                <Clock style={{ width: '24px', height: '24px' }} />
+              </div>
+              <div style={{ marginLeft: '16px' }}>
+                <p style={styles.statLabel}>In Progress</p>
+                <p style={styles.statValue}>
+                  {manifests.filter(m => {
+                    const stats = getManifestStats(m);
+                    return stats.percentage > 0 && stats.percentage < 100;
+                  }).length}
+                </p>
+              </div>
+            </div>
           </div>
-        )}
+          
+          <div style={styles.statCard}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{ ...styles.statIcon, backgroundColor: '#fee2e2', color: '#dc2626' }}>
+                <Package style={{ width: '24px', height: '24px' }} />
+              </div>
+              <div style={{ marginLeft: '16px' }}>
+                <p style={styles.statLabel}>Not Started</p>
+                <p style={styles.statValue}>
+                  {manifests.filter(m => getManifestStats(m).percentage === 0).length}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
 
-        {/* Manifests List - Only show when we have search results */}
-        {hasSearched && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {filteredManifests.map((manifest) => {
-              const stats = getManifestStats(manifest);
-              const isExpanded = expandedManifests.has(manifest.manifestNumber);
-              const statusColor = getStatusColor(stats.percentage);
-              
-              return (
-                <div key={manifest.manifestNumber} style={styles.manifestItem}>
-                  <div style={styles.manifestHeader}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <div style={{ flexShrink: 0 }}>
-                          <div style={{ padding: '8px', borderRadius: '8px', ...statusColor }}>
-                            <Package style={{ width: '20px', height: '20px' }} />
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <h3 style={styles.manifestTitle}>{manifest.manifestNumber}</h3>
-                          <p style={styles.manifestDate}>Created: {formatDate(manifest.createdAt)}</p>
-                        </div>
-                        
-                        <div style={{ 
-                          ...styles.statusBadge,
-                          backgroundColor: statusColor.backgroundColor,
-                          color: statusColor.color
-                        }}>
-                          {stats.percentage}% Complete
+        {/* Sorting Controls */}
+        <div style={styles.sortingControls}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '14px', fontWeight: '500', color: '#6b7280' }}>Sort by:</span>
+            <button
+              onClick={() => {
+                setSortBy('date');
+                setSortOrder(sortBy === 'date' ? (sortOrder === 'asc' ? 'desc' : 'asc') : 'desc');
+              }}
+              style={{
+                ...styles.sortButton,
+                ...(sortBy === 'date' ? styles.activeSortButton : {})
+              }}
+            >
+              Date {sortBy === 'date' && (sortOrder === 'asc' ? <ChevronUp style={{ display: 'inline', marginLeft: '4px' }} /> : <ChevronDown style={{ display: 'inline', marginLeft: '4px' }} />)}
+            </button>
+            <button
+              onClick={() => {
+                setSortBy('completion');
+                setSortOrder(sortBy === 'completion' ? (sortOrder === 'asc' ? 'desc' : 'asc') : 'desc');
+              }}
+              style={{
+                ...styles.sortButton,
+                ...(sortBy === 'completion' ? styles.activeSortButton : {})
+              }}
+            >
+              Completion {sortBy === 'completion' && (sortOrder === 'asc' ? <ChevronUp style={{ display: 'inline', marginLeft: '4px' }} /> : <ChevronDown style={{ display: 'inline', marginLeft: '4px' }} />)}
+            </button>
+          </div>
+        </div>
+
+        {/* Manifests List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {displayedManifests.map((manifest) => {
+            const stats = getManifestStats(manifest);
+            const isExpanded = expandedManifests.has(manifest.manifestNumber);
+            const statusColor = getStatusColor(stats.percentage);
+            
+            return (
+              <div key={manifest.manifestNumber} style={styles.manifestItem}>
+                <div style={styles.manifestHeader}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <div style={{ flexShrink: 0 }}>
+                        <div style={{ padding: '8px', borderRadius: '8px', ...statusColor }}>
+                          <Package style={{ width: '20px', height: '20px' }} />
                         </div>
                       </div>
                       
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ textAlign: 'center' }}>
-                            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#16a34a' }}>{stats.scanned}</div>
-                            <div style={{ fontSize: '12px', fontWeight: '500', color: '#6b7280', textTransform: 'uppercase' }}>Scanned</div>
-                          </div>
-                          
-                          <div style={{ textAlign: 'center' }}>
-                            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ea580c' }}>{stats.pending}</div>
-                            <div style={{ fontSize: '12px', fontWeight: '500', color: '#6b7280', textTransform: 'uppercase' }}>Pending</div>
-                          </div>
-                          
-                          <div style={{ textAlign: 'center' }}>
-                            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827' }}>{stats.total}</div>
-                            <div style={{ fontSize: '12px', fontWeight: '500', color: '#6b7280', textTransform: 'uppercase' }}>Total</div>
-                          </div>
-                          
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button
-                              onClick={() => exportToCSV(manifest)}
-                              style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '4px', 
-                                padding: '8px 12px',
-                                backgroundColor: '#f3f4f6',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontWeight: '500'
-                              }}
-                            >
-                              <Download style={{ width: '16px', height: '16px', color: "black" }} />
-                              <span style={{color: "black"}}>Export</span>
-                            </button>
-                            
-                            <button
-                              onClick={() => toggleManifest(manifest.manifestNumber)}
-                              style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '4px', 
-                                padding: '8px 12px',
-                                backgroundColor: '#f3f4f6',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontWeight: '500'
-                              }}
-                            >
-                              {isExpanded ? (
-                                <>
-                                  <EyeOff style={{ width: '16px', height: '16px', color: "black" }} />
-                                  <span style={{color: "black"}}>Hide</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Eye style={{ width: '16px', height: '16px', color: "black" }} />
-                                  <span style={{color: "black"}}>View</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        </div>
+                      <div>
+                        <h3 style={styles.manifestTitle}>{manifest.manifestNumber}</h3>
+                        <p style={styles.manifestDate}>Created: {formatDate(manifest.createdAt)}</p>
+                      </div>
+                      
+                      <div style={{ 
+                        ...styles.statusBadge,
+                        backgroundColor: statusColor.backgroundColor,
+                        color: statusColor.color
+                      }}>
+                        {stats.percentage}% Complete
                       </div>
                     </div>
                     
-                    {/* Progress Bar */}
-                    <div style={styles.progressBar}>
-                      <div 
-                        style={{ 
-                          ...styles.progressFill,
-                          backgroundColor: statusColor.color,
-                          width: `${stats.percentage}%`
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                  
-                  {/* Expanded Details */}
-                  {isExpanded && (
-                    <div style={styles.detailsSection}>
-                      <div style={styles.parcelsGrid}>
-                        {/* Scanned Parcels */}
-                        <div style={styles.parcelList}>
-                          <div style={{ ...styles.parcelListHeader, backgroundColor: '#dcfce7' }}>
-                            <h4 style={{ 
-                              fontSize: '18px', 
-                              fontWeight: '500', 
-                              color: '#111827', 
-                              margin: 0,
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}>
-                              <CheckCircle style={{ width: '20px', height: '20px', color: '#16a34a', marginRight: '8px' }} />
-                              Scanned Parcels ({stats.scanned})
-                            </h4>
-                          </div>
-                          <div style={{ maxHeight: '384px', overflowY: 'auto' }}>
-                            {manifest.parcels
-                              .filter(p => p.received)
-                              .map((parcel, index) => (
-                                <div key={index} style={styles.parcelItem}>
-                                  <div>
-                                    <div style={{ fontWeight: '500', color: '#111827' }}>{parcel.trackingNumber}</div>
-                                    <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>{parcel.consigneeName}</div>
-                                  </div>
-                                  <div style={{ textAlign: 'right' }}>
-                                    <div style={{ fontSize: '14px', color: '#6b7280' }}>
-                                      {parcel.receivedAt && formatDate(parcel.receivedAt)}
-                                    </div>
-                                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                                      by {parcel.receivedBy || 'Unknown'}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            {stats.scanned === 0 && (
-                              <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
-                                No parcels scanned yet
-                              </div>
-                            )}
-                          </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#16a34a' }}>{stats.scanned}</div>
+                          <div style={{ fontSize: '12px', fontWeight: '500', color: '#6b7280', textTransform: 'uppercase' }}>Scanned</div>
                         </div>
                         
-                        {/* Pending Parcels */}
-                        <div style={styles.parcelList}>
-                          <div style={{ ...styles.parcelListHeader, backgroundColor: '#ffedd5' }}>
-                            <h4 style={{ 
-                              fontSize: '18px', 
-                              fontWeight: '500', 
-                              color: '#111827', 
-                              margin: 0,
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}>
-                              <Clock style={{ width: '20px', height: '20px', color: '#ea580c', marginRight: '8px' }} />
-                              Pending Parcels ({stats.pending})
-                            </h4>
-                          </div>
-                          <div style={{ maxHeight: '384px', overflowY: 'auto' }}>
-                            {manifest.parcels
-                              .filter(p => !p.received)
-                              .map((parcel, index) => (
-                                <div key={index} style={styles.parcelItem}>
-                                  <div>
-                                    <div style={{ fontWeight: '500', color: '#111827' }}>{parcel.trackingNumber}</div>
-                                    <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>{parcel.consigneeName}</div>
-                                  </div>
-                                  <div style={{ textAlign: 'right' }}>
-                                    <div style={{ fontSize: '14px', color: '#6b7280' }}>
-                                      {parcel.shipmentDate && formatDate(parcel.shipmentDate)}
-                                    </div>
-                                    <div style={{ fontSize: '12px', fontWeight: '500', color: '#ea580c', marginTop: '4px' }}>
-                                      Awaiting Scan
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            {stats.pending === 0 && (
-                              <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
-                                All parcels have been scanned!
-                              </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ea580c' }}>{stats.pending}</div>
+                          <div style={{ fontSize: '12px', fontWeight: '500', color: '#6b7280', textTransform: 'uppercase' }}>Pending</div>
+                        </div>
+                        
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827' }}>{stats.total}</div>
+                          <div style={{ fontSize: '12px', fontWeight: '500', color: '#6b7280', textTransform: 'uppercase' }}>Total</div>
+                        </div>
+                        
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={() => exportToCSV(manifest)}
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '4px', 
+                              padding: '8px 12px',
+                              backgroundColor: '#f3f4f6',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontWeight: '500'
+                            }}
+                          >
+                            <Download style={{ width: '16px', height: '16px', color: "black" }} />
+                            <span style={{color: "black"}}>Export</span>
+                          </button>
+                          
+                          <button
+                            onClick={() => toggleManifest(manifest.manifestNumber)}
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '4px', 
+                              padding: '8px 12px',
+                              backgroundColor: '#f3f4f6',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontWeight: '500'
+                            }}
+                          >
+                            {isExpanded ? (
+                              <>
+                                <EyeOff style={{ width: '16px', height: '16px', color: "black" }} />
+                                <span style={{color: "black"}}>Hide</span>
+                              </>
+                            ) : (
+                              <>
+                                <Eye style={{ width: '16px', height: '16px', color: "black" }} />
+                                <span style={{color: "black"}}>View</span>
+                              </>
                             )}
-                          </div>
+                          </button>
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
+                  
+                  {/* Progress Bar */}
+                  <div style={styles.progressBar}>
+                    <div 
+                      style={{ 
+                        ...styles.progressFill,
+                        backgroundColor: statusColor.color,
+                        width: `${stats.percentage}%`
+                      }}
+                    ></div>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+                
+                {/* Expanded Details */}
+                {isExpanded && (
+                  <div style={styles.detailsSection}>
+                    <div style={styles.parcelsGrid}>
+                      {/* Scanned Parcels */}
+                      <div style={styles.parcelList}>
+                        <div style={{ ...styles.parcelListHeader, backgroundColor: '#dcfce7' }}>
+                          <h4 style={{ 
+                            fontSize: '18px', 
+                            fontWeight: '500', 
+                            color: '#111827', 
+                            margin: 0,
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}>
+                            <CheckCircle style={{ width: '20px', height: '20px', color: '#16a34a', marginRight: '8px' }} />
+                            Scanned Parcels ({stats.scanned})
+                          </h4>
+                        </div>
+                        <div style={{ maxHeight: '384px', overflowY: 'auto' }}>
+                          {manifest.parcels
+                            .filter(p => p.received)
+                            .map((parcel, index) => (
+                              <div key={index} style={styles.parcelItem}>
+                                <div>
+                                  <div style={{ fontWeight: '500', color: '#111827' }}>{parcel.trackingNumber}</div>
+                                  <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>{parcel.consigneeName}</div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                  <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                                    {parcel.receivedAt && formatDate(parcel.receivedAt)}
+                                  </div>
+                                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                    by {parcel.receivedBy || 'Unknown'}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          {stats.scanned === 0 && (
+                            <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
+                              No parcels scanned yet
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Pending Parcels */}
+                      <div style={styles.parcelList}>
+                        <div style={{ ...styles.parcelListHeader, backgroundColor: '#ffedd5' }}>
+                          <h4 style={{ 
+                            fontSize: '18px', 
+                            fontWeight: '500', 
+                            color: '#111827', 
+                            margin: 0,
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}>
+                            <Clock style={{ width: '20px', height: '20px', color: '#ea580c', marginRight: '8px' }} />
+                            Pending Parcels ({stats.pending})
+                          </h4>
+                        </div>
+                        <div style={{ maxHeight: '384px', overflowY: 'auto' }}>
+                          {manifest.parcels
+                            .filter(p => !p.received)
+                            .map((parcel, index) => (
+                              <div key={index} style={styles.parcelItem}>
+                                <div>
+                                  <div style={{ fontWeight: '500', color: '#111827' }}>{parcel.trackingNumber}</div>
+                                  <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>{parcel.consigneeName}</div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                  <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                                    {parcel.shipmentDate && formatDate(parcel.shipmentDate)}
+                                  </div>
+                                  <div style={{ fontSize: '12px', fontWeight: '500', color: '#ea580c', marginTop: '4px' }}>
+                                    Awaiting Scan
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          {stats.pending === 0 && (
+                            <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
+                              All parcels have been scanned!
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Load More */}
+        {displayedItems < filteredManifests.length && (
+  <div style={{ 
+    display: 'flex', 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    marginTop: '32px',
+    marginBottom: '24px'
+  }}>
+    <button
+      onClick={loadMore}
+      disabled={isLoadingMore}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '12px 24px',
+        backgroundColor: isLoadingMore ? '#f3f4f6' : '#2563eb',
+        color: isLoadingMore ? '#9ca3af' : 'white',
+        border: 'none',
+        borderRadius: '8px',
+        fontSize: '16px',
+        fontWeight: '500',
+        cursor: isLoadingMore ? 'not-allowed' : 'pointer',
+        transition: 'all 0.2s ease'
+      }}
+    >
+      {isLoadingMore ? (
+        <>
+          <RefreshCw style={{ 
+            width: '20px', 
+            height: '20px', 
+            animation: 'spin 1s linear infinite' 
+          }} />
+          Loading...
+        </>
+      ) : (
+        <>
+          <ChevronDown style={{ width: '20px', height: '20px' }} />
+          Load More ({Math.min(itemsPerPage, filteredManifests.length - displayedItems)} more)
+        </>
+      )}
+    </button>
+  </div>
+)}
+
+{/* Pagination Info */}
+{filteredManifests.length > 0 && (
+  <div style={{
+    textAlign: 'center',
+    color: '#6b7280',
+    fontSize: '14px',
+    marginBottom: '24px'
+  }}>
+    Showing {displayedItems} of {filteredManifests.length} manifests
+  </div>
+)}
         
-        {/* No results message */}
-        {hasSearched && filteredManifests.length === 0 && (
+        {filteredManifests.length === 0 && (
           <div style={styles.emptyState}>
             <Package style={{ width: '48px', height: '48px', color: '#9ca3af', margin: '0 auto 16px' }} />
             <h3 style={{ fontSize: '18px', fontWeight: '500', color: '#111827', marginBottom: '8px' }}>No manifests found</h3>
             <p style={{ color: '#6b7280' }}>
-              Try adjusting your search or filter criteria.
+              {searchTerm ? 'Try adjusting your search or filter criteria.' : 'No manifests have been created yet.'}
             </p>
           </div>
         )}
