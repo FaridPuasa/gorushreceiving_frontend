@@ -64,7 +64,7 @@ const Upload = () => {
     setMessage('');
 
     try {
-      const response = await fetch('https://grscanningsystemserver.onrender.com/api/manifest/paste', {
+      const response = await fetch('https://gorushscanning-server.onrender.com/api/manifest/paste', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

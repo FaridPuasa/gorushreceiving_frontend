@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'https://grscanningsystemserver.onrender.com'
+      '/api': 'https://gorushscanning-server.onrender.com'
     }
   }
 })

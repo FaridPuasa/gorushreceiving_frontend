@@ -11,7 +11,7 @@ export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    axios.defaults.baseURL = 'https://grscanningsystemserver.onrender.com';
+    axios.defaults.baseURL = 'https://gorushscanning-server.onrender.com';
     
     axios.interceptors.request.use(config => {
       const token = localStorage.getItem('token');

@@ -58,7 +58,7 @@ const handleOnHoldInputKeyDown = async (e) => {
     
     try {
       // Update Detrack status to On Hold
-      const response = await fetch('https://grscanningsystemserver.onrender.com/api/detrack/on-hold', {
+      const response = await fetch('https://gorushscanning-server.onrender.com/api/detrack/on-hold', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -145,7 +145,7 @@ const handleOnHoldInputKeyDown = async (e) => {
 useEffect(() => {
   const loadManifests = async () => {
     try {
-      const res = await fetch('https://grscanningsystemserver.onrender.com/api/manifests/scan-stats');
+      const res = await fetch('https://gorushscanning-server.onrender.com/api/manifests/scan-stats');
       const data = await res.json();
       if (data.success) {
         // Sort manifests by date (newest first)
@@ -243,7 +243,7 @@ const fetchCustomerStats = async (manifestNumber = null) => {
   try {
     if (manifestNumber === 'UNMANIFESTED') {
       // Special handling for unmanifested parcels
-      const res = await fetch(`https://grscanningsystemserver.onrender.com/api/manifests/UNMANIFESTED`);
+      const res = await fetch(`https://gorushscanning-server.onrender.com/api/manifests/UNMANIFESTED`);
       
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
@@ -273,7 +273,7 @@ const fetchCustomerStats = async (manifestNumber = null) => {
       }
 
       const manifestToFetch = manifestNumber || selectedManifest;
-      const res = await fetch(`https://grscanningsystemserver.onrender.com/api/stats/customers?manifest=${encodeURIComponent(manifestToFetch)}`);
+      const res = await fetch(`https://gorushscanning-server.onrender.com/api/stats/customers?manifest=${encodeURIComponent(manifestToFetch)}`);
       
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
@@ -330,7 +330,7 @@ const submitScan = async (trackingNumber, timestamp) => {
 
     console.log('🔍 FRONTEND: Request body being sent:', requestBody);
 
-    const response = await fetch('https://grscanningsystemserver.onrender.com/api/scan', {
+    const response = await fetch('https://gorushscanning-server.onrender.com/api/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
@@ -403,7 +403,7 @@ const updateGRDMSOrder = async (parcelData) => {
 
     console.log('🔍 FRONTEND: orderData being sent to backend:', orderData);
 
-    const response = await fetch('https://grscanningsystemserver.onrender.com/api/orders/update', {
+    const response = await fetch('https://gorushscanning-server.onrender.com/api/orders/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(orderData)
